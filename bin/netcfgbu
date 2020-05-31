@@ -1,40 +1,81 @@
 #!/usr/bin/env python
 
 import os
-from os.path import expandvars
 import sys
 from pathlib import Path
 import csv
+import logging
 
-import toml
 import asyncio
 import asyncssh
 
+import netcfgbu
 from netcfgbu.netcfgbu_ssh import ConfigBackupSSHTemplate
+from netcfgbu import netcfgbu_config
+from netcfgbu import os_specs
+
+
+class CommentedCsvReader(csv.DictReader):
+    def __next__(self):
+        value = super(CommentedCsvReader, self).__next__()
+
+        if value[self.fieldnames[0]].startswith('#'):
+            return self.__next__()
+
+        return value
+
+
+def setup_logging(app_cfg):
+
+    if log_cfg := app_cfg.get('logging'):
+        log_cfg['version'] = 1
+        from logging.config import dictConfig
+        dictConfig(log_cfg)
+
+    return logging.getLogger(netcfgbu.__package__)
 
 
 def main():
-    app_cfg_file = Path(os.environ['NETCFGBU_CONFIG'])
-
-    app_cfg = toml.load(app_cfg_file.open())
-
-    app_defaults = app_cfg['defaults']
-    for var_name, var_value in app_defaults.items():
-        app_defaults[var_name] = expandvars(var_value)
-
-    configs_dir = Path(app_defaults['configs_dir'])
-    if not configs_dir.is_dir():
-        configs_dir.mkdir()
-
-    inventory_file = Path(app_defaults['inventory'])
-    csv_rd = csv.DictReader(inventory_file.open())
-    inventory_recs = list(csv_rd)
-
-    host_cfg = inventory_recs[0]
 
     try:
-        bu = ConfigBackupSSHTemplate(host_cfg=host_cfg, app_cfg=app_cfg)
-        asyncio.run(bu.backup_config())
+        app_cfg_filepath = os.environ['NETCFGBU_CONFIG']
+
+    except (KeyError, OSError) as exc:
+        sys.exit(f"Unable to load configuration file: {str(exc)}")
+
+    app_cfg = netcfgbu_config.load(app_cfg_filepath)
+    log = setup_logging(app_cfg)
+
+    inventory_file = Path(app_cfg['defaults']['inventory'])
+    csv_rd = CommentedCsvReader(inventory_file.open())
+    inventory_recs = list(csv_rd)
+
+    backup_tasks = []
+    default_os_spec_cls = ConfigBackupSSHTemplate
+
+    for host_cfg in inventory_recs:
+        os_name = host_cfg['os_name']
+        os_spec_def = app_cfg.get('os_specs', {}).get(os_name) or {}
+        if 'class' in os_spec_def:
+            os_spec_cls = os_specs.get_class(os_spec_def['class'])
+        else:
+            os_spec_cls = default_os_spec_cls
+
+        host_spec = os_spec_cls(host_cfg=host_cfg, os_spec=os_spec_def, app_cfg=app_cfg)
+        backup_tasks.append(host_spec.backup_config())
+
+    async def process_backup_tasks():
+        done = 0
+        total = len(backup_tasks)
+        for res in asyncio.as_completed(backup_tasks):
+            bu_obj = await res
+            done += 1
+            _host_cfg = bu_obj.host_cfg
+            log.info(f"DONE ({done}/{total}): {_host_cfg['host']}")
+
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(process_backup_tasks())
 
     except (OSError, asyncssh.Error) as exc:
         sys.exit('SSH connection failed: ' + str(exc))
