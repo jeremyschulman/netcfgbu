@@ -1,0 +1,35 @@
+[defaults]
+inventory = "$HOME/Projects/NetworkBackup/inventory.csv"
+configs_dir = "$HOME/Projects/NetworkBackup/configs"
+
+[[credentials]]
+username = "jeremy.schulman"
+password = "$NETWORK_PASSWORD"
+
+[os_specs.eos]
+    disable_paging = "terminal length 0"
+
+[os_specs.asa]
+    disable_paging = 'terminal pager 0'
+
+[os_specs.aireos]
+    class = "netcfgbu.os_specs.cisco.CiscoWLCSSHSpec"
+
+
+# -----------------------------------------------------------------------------
+# Logging - follows Python format as described
+#   https://docs.python.org/3/library/logging.config.html
+# -----------------------------------------------------------------------------
+
+
+[logging.loggers.netcfgbu]
+    handlers = ["console"]
+    level = "INFO"
+
+[logging.handlers.console]
+    class = "logging.StreamHandler"
+    formatter = "basic"
+    stream = "ext://sys.stdout"
+
+[logging.formatters.basic]
+    format = "%(asctime)s %(levelname)s - %(message)s"
