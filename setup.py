@@ -23,5 +23,15 @@ setup(
     author='Jeremy Schulman',
     packages=find_packages(),
     include_package_data=True,
-    install_requires=requirements()
+    install_requires=requirements(),
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved',
+        'Operating System :: MacOS :: MacOS X',
+        'Operating System :: POSIX',
+        'Programming Language :: Python :: 3.8',
+        'Topic :: Software Development :: Libraries :: Python Modules',
+        'Topic :: System :: Networking'
+    ]
 )
