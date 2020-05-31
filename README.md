@@ -21,8 +21,8 @@ would like a tool to automate this process.
 
     (4) I want this tool to use a minimum number of 3rd-party packages to
     minimize the risk of dependency sprawl.  For example, I do not want to
-    include vendor specific libraries that can do
-    everything-under-the-kitchen-sink just so I can do a config backup.
+    include vendor specific libraries that can do everything under the kitchen
+    sink just so I can do a config backup.
         
     (5) I want this tool to be easily extensible so that when I have other
     network devices added to my environment I can easily update this tool.  Ideally
