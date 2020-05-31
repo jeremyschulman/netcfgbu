@@ -2,8 +2,8 @@
 
 **THIS IS A WORK IN PROGRESS**
 
-As a network engineer I need to backup my network configuration files, and I
-would like a tool to automate this process.
+As a network engineer I need to backup my network configuration files into a
+version control system, and I would like a tool to automate this process.
     
     (*) I will have multi-vendor environment, and I will need to handle all
     different types of device SSH connections.  Some of the devices will
