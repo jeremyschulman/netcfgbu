@@ -1,57 +1,62 @@
 #!/usr/bin/env python
 
-import os
-import sys
-from pathlib import Path
-import csv
-import logging
+# -----------------------------------------------------------------------------
+# System Imports
+# -----------------------------------------------------------------------------
 
+import sys
+import logging
 import asyncio
+from importlib import metadata
+from collections import defaultdict
+from errno import errorcode
+
+# -----------------------------------------------------------------------------
+# Public Imports
+# -----------------------------------------------------------------------------
+
 import asyncssh
+import click
+from tabulate import tabulate
+
+# -----------------------------------------------------------------------------
+# Private Imports
+# -----------------------------------------------------------------------------
 
 import netcfgbu
-from netcfgbu.netcfgbu_ssh import ConfigBackupSSHTemplate
+from netcfgbu.netcfgbu_ssh import ConfigBackupSSHSpec
 from netcfgbu import netcfgbu_config
 from netcfgbu import os_specs
+from netcfgbu.logger import get_logger
+from netcfgbu.probe import probe
+
+import netcfgbu.inventory
+
+VERSION = metadata.version(netcfgbu.__package__)
+
+_LOG = logging.getLogger()
+_LOG.addHandler(logging.NullHandler())
+
+LN_SEP = '# ' + '-' * 78
 
 
-class CommentedCsvReader(csv.DictReader):
-    def __next__(self):
-        value = super(CommentedCsvReader, self).__next__()
+# #############################################################################
+#
+#                                CODE BEGINS
+#
+# #############################################################################
 
-        if value[self.fieldnames[0]].startswith('#'):
-            return self.__next__()
+# -----------------------------------------------------------------------------
+#
+#                                EXEC BACKUP
+#
+# -----------------------------------------------------------------------------
 
-        return value
-
-
-def setup_logging(app_cfg):
-
-    if log_cfg := app_cfg.get('logging'):
-        log_cfg['version'] = 1
-        from logging.config import dictConfig
-        dictConfig(log_cfg)
-
-    return logging.getLogger(netcfgbu.__package__)
-
-
-def main():
-
-    try:
-        app_cfg_filepath = os.environ['NETCFGBU_CONFIG']
-
-    except (KeyError, OSError) as exc:
-        sys.exit(f"Unable to load configuration file: {str(exc)}")
-
-    app_cfg = netcfgbu_config.load(app_cfg_filepath)
-    log = setup_logging(app_cfg)
-
-    inventory_file = Path(app_cfg['defaults']['inventory'])
-    csv_rd = CommentedCsvReader(inventory_file.open())
-    inventory_recs = list(csv_rd)
+def exec_backup(app_cfg, inventory_recs):
 
     backup_tasks = []
-    default_os_spec_cls = ConfigBackupSSHTemplate
+    default_os_spec_cls = ConfigBackupSSHSpec
+    log = logging.getLogger(netcfgbu.__package__)
 
     for host_cfg in inventory_recs:
         os_name = host_cfg['os_name']
@@ -81,5 +86,181 @@ def main():
         sys.exit('SSH connection failed: ' + str(exc))
 
 
+# -----------------------------------------------------------------------------
+#
+#                                EXEC CHECK
+#
+# -----------------------------------------------------------------------------
+
+def exec_probe(inventory):
+    inv_n = len(inventory)
+    log = get_logger()
+    log.info(f"Checking SSH reachability on {inv_n} devices ...")
+
+    tasks = dict()
+    loop = asyncio.get_event_loop()
+    futures = list()
+
+    tasks = {
+        probe(rec.get('ipaddr') or rec.get('host')): rec
+        for rec in inventory
+    }
+
+    for coro in tasks.keys():
+        fut = asyncio.ensure_future(coro)
+        wrapper = loop.create_future()
+        fut.add_done_callback(wrapper.set_result)
+        futures.append(wrapper)
+
+    report = defaultdict(list)
+
+    async def proces_check():
+        for probe_task in asyncio.as_completed(futures):
+
+            try:
+                task_res = await probe_task
+                task_coro = task_res.get_coro()
+                rec = tasks[task_coro]
+                probe_ok = 'OK' if task_res.result() else 'FAIL'
+                report[probe_ok].append(rec)
+
+            except OSError as exc:
+                probe_ok = 'ERROR'
+                report['ERROR'].append((rec, exc))
+
+            print(f"{rec['host']}: {probe_ok}")
+
+    loop.run_until_complete(proces_check())
+
+    ok_n = len(report['OK'])
+
+    print(LN_SEP)
+
+    if ok_n == inv_n:
+        print(f"Summary: ALL OK!")
+        return
+
+    fail_n = len(report['FAIL'])
+    err_n = len(report['ERROR'])
+
+    print(f"SUMMARY:\n\tOK={ok_n}\n\tFAIL={fail_n}\n\tERROR={err_n}")
+
+    if fail_n:
+        print("\n\nFAIL:")
+        print(tabulate(
+            headers=['host', 'os_name'],
+            tabular_data=[[rec['host'], rec['os_name']]
+                          for rec in report['FAIL']]
+        ))
+
+    if err_n:
+        print("\n\nERROR:")
+        print(tabulate(
+            headers=['host', 'os_name', 'reason'],
+            tabular_data=[
+                [rec['host'], rec['os_name'], errorcode[exc.errno]]
+                for rec, exc in report['ERROR']
+            ]
+        ))
+
+
+# -----------------------------------------------------------------------------
+#
+#                                CLI
+#
+# -----------------------------------------------------------------------------
+
+
+opt_config_file = click.option(
+    '-C', '--config',
+    envvar='NETCFGBU_CONFIG',
+    type=click.File()
+)
+
+
+@click.group()
+@click.version_option(
+    version=VERSION
+)
+def cli():
+    pass
+
+
+@cli.command(name='backup')
+@opt_config_file
+@click.option(
+    '--limit', '-l',
+    multiple=True,
+    help="limit inventory",
+
+)
+def cli_backup(**cli_opts):
+    app_cfg = netcfgbu_config.load(
+        fileio=cli_opts['config']
+    )
+
+    inventory_recs = netcfgbu.inventory.load(
+        app_cfg=app_cfg,
+        limits=cli_opts['limit']
+    )
+
+
+@cli.command(name='check')
+@opt_config_file
+@click.option(
+    '--limit', '-l',
+    multiple=True,
+    help="limit inventory",
+
+)
+def cli_check(**cli_opts):
+    """
+    Check each device for SSH reachablility (probe)
+    """
+    app_cfg = netcfgbu_config.load(
+        fileio=cli_opts['config']
+    )
+
+    if not cli_opts['limit']:
+        value = click.prompt('Process full inventory, are you sure? [n/Y]', default='n')
+        if value != 'Y':
+            sys.exit("aborting.")
+
+    inventory_recs = netcfgbu.inventory.load(
+        app_cfg=app_cfg,
+        limits=cli_opts['limit']
+    )
+
+    if not inventory_recs:
+        sys.exit("No inventory matching limits.")
+
+    exec_probe(inventory_recs)
+
+
+@cli.command(name='inventory')
+@opt_config_file
+@click.option(
+    '--limit', '-l',
+    multiple=True,
+    help="limit inventory",
+
+)
+def cli_inventory(**cli_opts):
+
+    app_cfg = netcfgbu_config.load(
+        fileio=cli_opts['config']
+    )
+
+    inventory_recs = netcfgbu.inventory.load(
+        app_cfg=app_cfg,
+        limits=cli_opts['limit']
+    )
+
+    print(tabulate(
+        headers=["host", "os_name"],
+        tabular_data=[[rec['host'], rec['os_name']] for rec in inventory_recs]
+    ))
+
+
 if __name__ == '__main__':
-    main()
+    cli()

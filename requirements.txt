@@ -1,2 +1,5 @@
-asyncssh
-toml
+asyncssh~=2.2.1
+toml~=0.10.1
+click~=7.1.2
+cryptography~=2.9.2
+tabulate

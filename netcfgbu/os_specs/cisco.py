@@ -1,4 +1,4 @@
-from netcfgbu.netcfgbu_ssh import ConfigBackupSSHTemplate
+from netcfgbu.netcfgbu_ssh import ConfigBackupSSHSpec
 
 cisco_spec = {
     'disable_paging': 'terminal length 0'
@@ -9,7 +9,7 @@ cisco_asa_spec = {
 }
 
 
-class CiscoWLCSSHSpec(ConfigBackupSSHTemplate):
+class CiscoWLCSSHSpec(ConfigBackupSSHSpec):
     show_running = "show run-config commands"
     disable_paging = "config paging disable"
 
