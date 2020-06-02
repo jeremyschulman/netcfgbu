@@ -29,6 +29,7 @@ from netcfgbu import netcfgbu_config
 from netcfgbu import os_specs
 from netcfgbu.logger import get_logger
 from netcfgbu.probe import probe
+from netcfgbu.aiofut import as_completed
 
 import netcfgbu.inventory
 
@@ -99,36 +100,27 @@ def exec_probe(inventory):
 
     tasks = dict()
     loop = asyncio.get_event_loop()
-    futures = list()
 
     tasks = {
         probe(rec.get('ipaddr') or rec.get('host')): rec
         for rec in inventory
     }
 
-    for coro in tasks.keys():
-        fut = asyncio.ensure_future(coro)
-        wrapper = loop.create_future()
-        fut.add_done_callback(wrapper.set_result)
-        futures.append(wrapper)
-
     report = defaultdict(list)
 
     async def proces_check():
-        for probe_task in asyncio.as_completed(futures):
-
+        async for probe_task in as_completed(tasks):
             try:
-                task_res = await probe_task
-                task_coro = task_res.get_coro()
+                task_coro = probe_task.get_coro()
                 rec = tasks[task_coro]
-                probe_ok = 'OK' if task_res.result() else 'FAIL'
+                probe_ok = 'OK' if probe_task.result() else 'FAIL'
                 report[probe_ok].append(rec)
 
             except OSError as exc:
                 probe_ok = 'ERROR'
                 report['ERROR'].append((rec, exc))
 
-            print(f"{rec['host']}: {probe_ok}")
+            log.info(f"{rec['host']}: {probe_ok}")
 
     loop.run_until_complete(proces_check())
 
@@ -137,13 +129,14 @@ def exec_probe(inventory):
     print(LN_SEP)
 
     if ok_n == inv_n:
-        print(f"Summary: ALL OK!")
+        print(f"Summary: ALL {inv_n} OK!")
+        print(LN_SEP)
         return
 
     fail_n = len(report['FAIL'])
     err_n = len(report['ERROR'])
 
-    print(f"SUMMARY:\n\tOK={ok_n}\n\tFAIL={fail_n}\n\tERROR={err_n}")
+    print(f"SUMMARY: TOTAL={inv_n} OK={ok_n} FAIL={fail_n} ERROR={err_n}")
 
     if fail_n:
         print("\n\nFAIL:")
@@ -162,6 +155,8 @@ def exec_probe(inventory):
                 for rec, exc in report['ERROR']
             ]
         ))
+
+    print(LN_SEP)
 
 
 # -----------------------------------------------------------------------------
@@ -205,7 +200,7 @@ def cli_backup(**cli_opts):
     )
 
 
-@cli.command(name='check')
+@cli.command(name='probe')
 @opt_config_file
 @click.option(
     '--limit', '-l',
@@ -215,7 +210,10 @@ def cli_backup(**cli_opts):
 )
 def cli_check(**cli_opts):
     """
-    Check each device for SSH reachablility (probe)
+    Probe each device for SSH reachablility.
+
+    The probe check determines if the device is reachable and the SSH port
+    is available to receive connections.
     """
     app_cfg = netcfgbu_config.load(
         fileio=cli_opts['config']
