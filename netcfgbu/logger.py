@@ -1,34 +1,77 @@
-from logging.config import dictConfig
-from aiologger import Logger
-from functools import lru_cache
-from aiologger.formatters.base import Formatter
+import sys
+from typing import Set, Optional
+import asyncio
+from queue import SimpleQueue as Queue
 
-_LOG_CONFIG = None
+from logging.config import dictConfig
+from logging import getLogger
+import logging
+import logging.handlers
+
+
+__all__ = ['get_logger']
+
+_g_log_que_listener: Optional[logging.handlers.QueueListener] = None
+
+
+class LocalQueueHandler(logging.handlers.QueueHandler):
+    def emit(self, record: logging.LogRecord) -> None:
+        # Removed the call to self.prepare(), handle task cancellation
+        try:
+            self.enqueue(record)
+
+        except asyncio.CancelledError:
+            raise
+
+        except asyncio.QueueFull:
+            self.handleError(record)
+
+
+def setup_logging_queue(logger_names) -> None:
+    """
+    Move log handlers to a separate thread.
+
+    Replace all configured handlers with a LocalQueueHandler, and start a
+    logging.QueueListener holding the original handlers.
+    """
+    global _g_log_que_listener
+
+    queue = Queue()
+    handlers: Set[logging.Handler] = set()
+    que_handler = LocalQueueHandler(queue)
+
+    for lname in logger_names:
+        lgr = logging.getLogger(lname)
+        lgr.addHandler(que_handler)
+        for h in lgr.handlers[:]:
+            if h is not que_handler:
+                lgr.removeHandler(h)
+                handlers.add(h)
+
+    _g_log_que_listener = logging.handlers.QueueListener(
+        queue, *handlers,
+        respect_handler_level=True
+    )
+
+    _g_log_que_listener.start()
 
 
 def setup_logging(app_cfg):
-    global _LOG_CONFIG
-    if log_cfg := app_cfg.get('logging'):
-        log_cfg['version'] = 1
-        dictConfig(log_cfg)
-        _LOG_CONFIG = log_cfg
+    if (log_cfg := app_cfg.get('logging')) is None:
+        return
+
+    log_cfg['version'] = 1
+    dictConfig(log_cfg)
+    setup_logging_queue(log_cfg['loggers'])
 
 
-@lru_cache()
+def stop_qlogging():
+    if not _g_log_que_listener:
+        return
+
+    _g_log_que_listener.stop()
+    sys.stdout.flush()
+
+
 def get_logger():
-    lgr_name = __package__
-
-    try:
-        std_ldr = _LOG_CONFIG['loggers'][lgr_name]
-        std_hdr = _LOG_CONFIG['handlers'][std_ldr['handlers'][0]]
-        fmt_name = std_hdr['formatter']
-        std_fmt = _LOG_CONFIG['formatters'][fmt_name]
-        fmt = std_fmt['format']
-
-    except KeyError:
-        fmt = None
-
-    return Logger.with_default_handlers(
-        name=__package__,
-        formatter=Formatter(fmt)
-    )
+    return getLogger(__package__)

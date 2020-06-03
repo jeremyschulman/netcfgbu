@@ -1,14 +1,22 @@
 from typing import Optional
-import re
-import asyncssh
-import io
 import asyncio
+import io
 from pathlib import Path
+import re
 from copy import copy
 
 import aiofiles
+import asyncssh
+
 
 from . logger import get_logger
+from . import consts
+
+
+__all__ = [
+    'ConfigBackupSSHSpec',
+    'set_max_startups'
+]
 
 
 class ConfigBackupSSHSpec(object):
@@ -45,6 +53,8 @@ class ConfigBackupSSHSpec(object):
     show_running = 'show running-config'
     disable_paging = None
 
+    _max_startups_sem4 = asyncio.Semaphore(consts.DEFAULT_MAX_STARTUPS)
+
     def __init__(
         self,
         host_cfg: dict,
@@ -77,12 +87,17 @@ class ConfigBackupSSHSpec(object):
             'known_hosts': None
         }
 
+        self._cur_prompt: Optional[str] = None
         self.config = None
         self.save_file = None
         self.failed = None
 
         self.conn = None
-        self.process = None
+        self.process: Optional[asyncssh.SSHClientProcess] = None
+
+    @classmethod
+    def set_max_startups(cls, max_startups):
+        cls._max_startups_sem4 = asyncio.Semaphore(value=max_startups)
 
     # -------------------------------------------------------------------------
     #
@@ -103,15 +118,15 @@ class ConfigBackupSSHSpec(object):
             examined once the backup process completes, or fails.
         """
 
-        await self.login()
-        try:
-            await self.get_running_config()
+        async with await self.login():
+            try:
+                await self.get_running_config()
 
-        except Exception as exc:
-            await self.log.error(f"BACKUP FAILED: {str(exc)}")
+            except Exception as exc:
+                self.log.error(f"BACKUP FAILED: {str(exc)}")
 
-        finally:
-            await self.close()
+            finally:
+                await self.close()
 
         if self.config:
             await self.save_config()
@@ -125,13 +140,16 @@ class ConfigBackupSSHSpec(object):
     # -------------------------------------------------------------------------
 
     async def test_login(self) -> Optional[str]:
+        login_as = None
+
         try:
-            await self.login()
-            await self.close()
-            return self.conn_args['username']
+            async with await self.login():
+                login_as = self.conn_args['username']
 
         except asyncssh.PermissionDenied:
-            return None
+            pass
+
+        return login_as
 
     # -------------------------------------------------------------------------
     #
@@ -175,7 +193,7 @@ class ConfigBackupSSHSpec(object):
     #
     # -------------------------------------------------------------------------
 
-    async def login(self) -> None:
+    async def login(self):
         """
         This coroutine is used to execute the SSH login process to the target device.
         Each of the `credentials` provided in the app-configure are tried in the order
@@ -188,13 +206,20 @@ class ConfigBackupSSHSpec(object):
         `process` attribute is also initiazed so that the `process.stdin` and
         `process.stdout` can be used to interact with the SSH CLI.
 
+        Returns
+        -------
+        The AsyncSSH will obtain a protocol connection instance from asyncio.loop.create_connection(), and
+        then enrobe it with an async context manager so that the Caller can either use the instnace
+        directly or as a context manager.
+
         Raises
         ------
         asyncssh.PermissionDenied
             When none of the provided credentials result in a successful login.
 
+        asyncio.TimeoutError
+            When attempting to connect to a device exceeds the timeout value.
         """
-        await self.log.info(f"LOGIN: {self.name} ({self.os_name})")
 
         creds = copy(self.app_cfg['credentials'])
 
@@ -206,37 +231,49 @@ class ConfigBackupSSHSpec(object):
         if all(host_creds.values()):
             creds.insert(0, host_creds)
 
+        # TODO:
+        #       if there are os_spec specific credentials then add those next
+
+        # interate through all of the credential options until one is accepted.
+        # the number of max setup connections is controlled by a semaphore
+        # instance so that the server running this code is not overwhelmed.
+
         for try_cred in creds:
             try:
                 self.failed = None
                 self.conn_args.update(try_cred)
-                self.conn = await asyncio.wait_for(asyncssh.connect(**self.conn_args), timeout=60)
-                await self.log.info(f"CONNECTED: {self.name}")
+                async with self.__class__._max_startups_sem4:
 
-                if (
-                    'disable_paging' in self.os_spec or
-                    self.disable_paging
-                ):
-                    self.process = await self.conn.create_process(term_type='vt100')
+                    login_msg = (f"LOGIN: {self.name} ({self.os_name}) "
+                                 f"as {self.conn_args['username']}")
 
-                return self.conn
+                    self.log.info(login_msg)
+                    self.conn = await asyncio.wait_for(asyncssh.connect(**self.conn_args), timeout=60)
+                    self.log.info(f"CONNECTED: {self.name}")
+
+                    if (
+                        'disable_paging' in self.os_spec or
+                        self.disable_paging
+                    ):
+                        self.process = await self.conn.create_process(term_type='vt100')
+
+                    return self.conn
 
             except asyncssh.PermissionDenied as exc:
                 self.failed = exc
                 continue
 
+        # Indicate that the login failed with the number of credential
+        # attempts.
+
         raise asyncssh.PermissionDenied(
-            reason='Bad username/password'
+            reason=f'No valid username/password ({len(creds)})'
         )
 
     async def close(self):
-        # TODO: not sure if I need to do this or not
-        # if self.process:
-        #     self.process.terminate()
-
         self.conn.close()
         await self.conn.wait_closed()
-        await self.log.info(f"CLOSED: {self.name}")
+        self.log.info(f"CLOSED: {self.name}")
 
     # -------------------------------------------------------------------------
     #
@@ -250,18 +287,14 @@ class ConfigBackupSSHSpec(object):
             output += await self.process.stdout.read(io.DEFAULT_BUFFER_SIZE)
             nl_at = output.rfind('\n')
             if mobj := self.PROMPT_PATTERN.match(output[nl_at + 1:]):
-                return mobj.group(1)
+                self._cur_prompt = mobj.group(1)
+                return output[0:nl_at]
 
     async def run_command(self, command):
         wr_cmd = command + "\n"
         self.process.stdin.write(wr_cmd)
-
-        output = ''
-        while True:
-            output += await self.process.stdout.read(io.DEFAULT_BUFFER_SIZE)
-            nl_at = output.rfind('\n')
-            if nl_at > 0 and self.PROMPT_PATTERN.match(output[nl_at + 1:]):
-                return output[len(wr_cmd) + 1:nl_at]
+        output = await self.read_until_prompt()
+        return output[len(wr_cmd) + 1:]
 
     async def run_disable_paging(self):
         """
@@ -285,6 +318,10 @@ class ConfigBackupSSHSpec(object):
 
     async def save_config(self):
         self.save_file = Path(self.app_cfg['defaults']['configs_dir']) / f"{self.name}.cfg"
-        async with aiofiles.open('filename', mode='w+') as ofile:
+        async with aiofiles.open(self.save_file, mode='w+') as ofile:
             await ofile.write(self.config.replace("\r", ""))
             await ofile.write("\n")
+
+
+def set_max_startups(count, cls=ConfigBackupSSHSpec):
+    cls.set_max_startups(count)

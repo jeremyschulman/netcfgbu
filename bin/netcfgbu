@@ -25,10 +25,10 @@ from tabulate import tabulate
 # -----------------------------------------------------------------------------
 
 import netcfgbu
-from netcfgbu.netcfgbu_ssh import ConfigBackupSSHSpec
+from netcfgbu.netcfgbu_ssh import ConfigBackupSSHSpec, set_max_startups
 from netcfgbu import netcfgbu_config
 from netcfgbu import os_specs
-from netcfgbu.logger import get_logger
+from netcfgbu.logger import get_logger, stop_qlogging
 from netcfgbu.probe import probe
 from netcfgbu.aiofut import as_completed
 
@@ -73,6 +73,15 @@ def make_batches(tasks, batch_n=None):
     return batches
 
 
+def err_reason(exc):
+    if isinstance(exc, OSError):
+        return errorcode[exc.errno]
+    elif isinstance(exc, asyncio.TimeoutError):
+        return "TIMEOUT - device failed to connect via SSH"
+    else:
+        return "%s: %s" % (str(exc.__class__.__name__), str(exc))
+
+
 def print_report(report, total_n):
 
     fail_n = len(report["fail"])
@@ -90,14 +99,6 @@ def print_report(report, total_n):
                 tabular_data=[[rec["host"], rec["os_name"]] for rec in report["FAIL"]],
             )
         )
-
-    def err_reason(exc):
-        if isinstance(exc, OSError):
-            return errorcode[exc.errno]
-        elif isinstance(exc, asyncio.TimeoutError):
-            return "TIMEOUT - device failed to connect via SSH"
-        else:
-            return "%s: %s" % (str(exc.__class__.__name__), str(exc))
 
     if err_n:
         print(f"\n\nERRORS: ({err_n})")
@@ -175,36 +176,38 @@ def exec_test_login(app_cfg, inventory_recs, cli_opts):
         for rec in inventory_recs
     }
 
+    if (batch_n := cli_opts['batch']) is not None:
+        set_max_startups(batch_n)
+
     total = len(login_tasks)
 
     report = defaultdict(list)
-    batches = make_batches(login_tasks, cli_opts["batch"])
-
     done = 0
+    log = get_logger()
 
-    async def process_batch(_batch):
+    async def process_batch():
         nonlocal done
-        log = get_logger()
-        async for task in as_completed(_batch):
+
+        async for task in as_completed(login_tasks):
             done += 1
             coro = task.get_coro()
             rec = login_tasks[coro]
             msg = f"DONE ({done}/{total}): {rec['host']} "
             try:
                 if login_user := task.result():
-                    await log.info(msg + f"with user {login_user}")
+                    log.info(msg + f"with user {login_user}")
                     report["ok"].append(rec)
                 else:
-                    await log.warning(msg + "NO LOGIN")
+                    log.warning(msg + "NO LOGIN")
                     report["fail"].append(rec)
 
             except Exception as exc:
                 report["error"].append((rec, exc))
-                await log.error(msg + f": {str(exc)}")
+                log.error(msg + f": {err_reason(exc)}")
 
     loop = asyncio.get_event_loop()
-    for batch in batches:
-        loop.run_until_complete(process_batch(batch))
+    loop.run_until_complete(process_batch())
+    stop_qlogging()
 
     print_report(report, len(inventory_recs))
 
@@ -238,7 +241,7 @@ def exec_probe(inventory):
                 probe_ok = "ERROR"
                 report["ERROR"].append((rec, exc))
 
-            await log.info(f"{rec['host']}: {probe_ok}")
+            log.info(f"{rec['host']}: {probe_ok}")
 
     loop.run_until_complete(proces_check())
 
