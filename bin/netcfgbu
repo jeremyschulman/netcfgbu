@@ -5,17 +5,18 @@
 # -----------------------------------------------------------------------------
 
 import sys
-import logging
 import asyncio
 from importlib import metadata
-from collections import defaultdict
+from collections import defaultdict, Counter
 from errno import errorcode
+from operator import itemgetter
+from textwrap import indent
+from itertools import zip_longest
 
 # -----------------------------------------------------------------------------
 # Public Imports
 # -----------------------------------------------------------------------------
 
-import asyncssh
 import click
 from tabulate import tabulate
 
@@ -35,10 +36,9 @@ import netcfgbu.inventory
 
 VERSION = metadata.version(netcfgbu.__package__)
 
-_LOG = logging.getLogger()
-_LOG.addHandler(logging.NullHandler())
 
-LN_SEP = '# ' + '-' * 78
+LN_SEP = "# " + "-" * 78
+SPACES_4 = " " * 4
 
 
 # #############################################################################
@@ -47,51 +47,172 @@ LN_SEP = '# ' + '-' * 78
 #
 # #############################################################################
 
+
+def make_host_os_spec(rec, app_cfg):
+
+    os_name = rec["os_name"]
+    os_spec_def = app_cfg.get("os_specs", {}).get(os_name) or {}
+    if "class" in os_spec_def:
+        os_spec_cls = os_specs.get_class(os_spec_def["class"])
+    else:
+        os_spec_cls = ConfigBackupSSHSpec
+
+    return os_spec_cls(host_cfg=rec, os_spec=os_spec_def, app_cfg=app_cfg)
+
+
+def make_batches(tasks, batch_n=None):
+    if not batch_n:
+        return [tasks]
+
+    args = [iter(tasks)] * batch_n
+    batches = list(zip_longest(*args))
+    if None in batches[-1]:
+        batches[-1] = [coro for coro in batches[-1] if coro]
+
+    get_logger().info(f"BATCHING by {batch_n}, COUNT: {len(batches)}")
+    return batches
+
+
+def print_report(report, total_n):
+
+    fail_n = len(report["fail"])
+    ok_n = len(report["ok"])
+    err_n = len(report["error"])
+
+    print(LN_SEP)
+    print(f"Summary: TOTAL={total_n}, OK={ok_n}, FAIL={fail_n}, ERROR={err_n}")
+
+    if fail_n:
+        print(f"\n\nFAIL: ({fail_n})")
+        print(
+            tabulate(
+                headers=["host", "os_name"],
+                tabular_data=[[rec["host"], rec["os_name"]] for rec in report["FAIL"]],
+            )
+        )
+
+    def err_reason(exc):
+        if isinstance(exc, OSError):
+            return errorcode[exc.errno]
+        else:
+            return "%s: %s" % (str(exc.__class__.__name__), str(exc))
+
+    if err_n:
+        print(f"\n\nERRORS: ({err_n})")
+        print(
+            tabulate(
+                headers=["host", "os_name", "reason"],
+                tabular_data=[
+                    [rec["host"], rec["os_name"], err_reason(exc)]
+                    for rec, exc in report["error"]
+                ],
+            )
+        )
+
+    print(LN_SEP)
+
+
 # -----------------------------------------------------------------------------
 #
 #                                EXEC BACKUP
 #
 # -----------------------------------------------------------------------------
 
-def exec_backup(app_cfg, inventory_recs):
 
-    backup_tasks = []
-    default_os_spec_cls = ConfigBackupSSHSpec
-    log = logging.getLogger(netcfgbu.__package__)
+def exec_backup(app_cfg, inventory_recs, cli_opts):
 
-    for host_cfg in inventory_recs:
-        os_name = host_cfg['os_name']
-        os_spec_def = app_cfg.get('os_specs', {}).get(os_name) or {}
-        if 'class' in os_spec_def:
-            os_spec_cls = os_specs.get_class(os_spec_def['class'])
-        else:
-            os_spec_cls = default_os_spec_cls
+    backup_tasks = dict()
 
-        host_spec = os_spec_cls(host_cfg=host_cfg, os_spec=os_spec_def, app_cfg=app_cfg)
-        backup_tasks.append(host_spec.backup_config())
+    log = get_logger()
 
-    async def process_backup_tasks():
-        done = 0
-        total = len(backup_tasks)
-        for res in asyncio.as_completed(backup_tasks):
-            bu_obj = await res
+    backup_tasks = {
+        make_host_os_spec(rec, app_cfg).backup_config(): rec for rec in inventory_recs
+    }
+
+    total = len(backup_tasks)
+    report = defaultdict(list)
+
+    batches = make_batches(backup_tasks, cli_opts["batch"])
+
+    done = 0
+
+    async def process_batch(_batch):
+        nonlocal done
+        async for task in as_completed(_batch):
             done += 1
-            _host_cfg = bu_obj.host_cfg
-            log.info(f"DONE ({done}/{total}): {_host_cfg['host']}")
+            coro = task.get_coro()
+            rec = backup_tasks[coro]
+            msg = f"DONE ({done}/{total}): {rec['host']} "
 
-    try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(process_backup_tasks())
+            try:
+                task.result()
+                log.info(msg + ": OK")
 
-    except (OSError, asyncssh.Error) as exc:
-        sys.exit('SSH connection failed: ' + str(exc))
+            except Exception as exc:
+                report["error"].append((rec, exc))
+                log.error(msg + f": {str(exc)}")
+
+    loop = asyncio.get_event_loop()
+    for batch in batches:
+        loop.run_until_complete(process_batch(batch))
+
+    print_report(report, len(inventory_recs))
 
 
 # -----------------------------------------------------------------------------
 #
-#                                EXEC CHECK
+#                                EXEC LOGIN
 #
 # -----------------------------------------------------------------------------
+
+
+def exec_test_login(app_cfg, inventory_recs, cli_opts):
+
+    login_tasks = {
+        make_host_os_spec(rec, app_cfg).test_login(): rec
+        for rec in inventory_recs
+    }
+
+    total = len(login_tasks)
+
+    report = defaultdict(list)
+    batches = make_batches(login_tasks, cli_opts["batch"])
+
+    done = 0
+
+    async def process_batch(_batch):
+        nonlocal done
+        log = get_logger()
+        async for task in as_completed(_batch):
+            done += 1
+            coro = task.get_coro()
+            rec = login_tasks[coro]
+            msg = f"DONE ({done}/{total}): {rec['host']} "
+            try:
+                if login_user := task.result():
+                    await log.info(msg + f"with user {login_user}")
+                    report["ok"].append(rec)
+                else:
+                    await log.warning(msg + "NO LOGIN")
+                    report["fail"].append(rec)
+
+            except Exception as exc:
+                report["error"].append((rec, exc))
+                await log.error(msg + f": {str(exc)}")
+
+    loop = asyncio.get_event_loop()
+    for batch in batches:
+        loop.run_until_complete(process_batch(batch))
+
+    print_report(report, len(inventory_recs))
+
+
+# -----------------------------------------------------------------------------
+#
+#                                EXEC PROBE
+#
+# -----------------------------------------------------------------------------
+
 
 def exec_probe(inventory):
     inv_n = len(inventory)
@@ -100,12 +221,7 @@ def exec_probe(inventory):
 
     tasks = dict()
     loop = asyncio.get_event_loop()
-
-    tasks = {
-        probe(rec.get('ipaddr') or rec.get('host')): rec
-        for rec in inventory
-    }
-
+    tasks = {probe(rec.get("ipaddr") or rec.get("host")): rec for rec in inventory}
     report = defaultdict(list)
 
     async def proces_check():
@@ -113,18 +229,18 @@ def exec_probe(inventory):
             try:
                 task_coro = probe_task.get_coro()
                 rec = tasks[task_coro]
-                probe_ok = 'OK' if probe_task.result() else 'FAIL'
+                probe_ok = "OK" if probe_task.result() else "FAIL"
                 report[probe_ok].append(rec)
 
             except OSError as exc:
-                probe_ok = 'ERROR'
-                report['ERROR'].append((rec, exc))
+                probe_ok = "ERROR"
+                report["ERROR"].append((rec, exc))
 
-            log.info(f"{rec['host']}: {probe_ok}")
+            await log.info(f"{rec['host']}: {probe_ok}")
 
     loop.run_until_complete(proces_check())
 
-    ok_n = len(report['OK'])
+    ok_n = len(report["OK"])
 
     print(LN_SEP)
 
@@ -133,28 +249,33 @@ def exec_probe(inventory):
         print(LN_SEP)
         return
 
-    fail_n = len(report['FAIL'])
-    err_n = len(report['ERROR'])
+    fail_n = len(report["FAIL"])
+    err_n = len(report["ERROR"])
 
     print(f"SUMMARY: TOTAL={inv_n} OK={ok_n} FAIL={fail_n} ERROR={err_n}")
 
     if fail_n:
         print("\n\nFAIL:")
-        print(tabulate(
-            headers=['host', 'os_name'],
-            tabular_data=[[rec['host'], rec['os_name']]
-                          for rec in report['FAIL']]
-        ))
+        print(
+            tabulate(
+                headers=["host", "os_name"],
+                tabular_data=[[rec["host"], rec["os_name"]] for rec in report["FAIL"]],
+            )
+        )
 
     if err_n:
         print("\n\nERROR:")
-        print(tabulate(
-            headers=['host', 'os_name', 'reason'],
-            tabular_data=[
-                [rec['host'], rec['os_name'], errorcode[exc.errno]]
-                for rec, exc in report['ERROR']
-            ]
-        ))
+        print(
+            tabulate(
+                headers=["host", "os_name", "reason"],
+                tabular_data=[
+                    [rec["host"], rec["os_name"], errorcode[exc.errno]]
+                    for rec, exc in report["ERROR"]
+                ],
+            )
+        )
+
+    print(LN_SEP)
 
     print(LN_SEP)
 
@@ -167,47 +288,40 @@ def exec_probe(inventory):
 
 
 opt_config_file = click.option(
-    '-C', '--config',
-    envvar='NETCFGBU_CONFIG',
-    type=click.File()
+    "-C", "--config", envvar="NETCFGBU_CONFIG", type=click.File()
+)
+
+opt_limits = click.option("--limit", "-l", multiple=True, help="limit inventory",)
+
+opt_batch = click.option(
+    "--batch",
+    "-b",
+    type=click.IntRange(1, 500),
+    help="inevntory record processing batch size",
 )
 
 
 @click.group()
-@click.version_option(
-    version=VERSION
-)
+@click.version_option(version=VERSION)
 def cli():
     pass
 
 
-@cli.command(name='backup')
+@cli.command(name="backup")
 @opt_config_file
-@click.option(
-    '--limit', '-l',
-    multiple=True,
-    help="limit inventory",
-
-)
+@opt_limits
+@opt_batch
 def cli_backup(**cli_opts):
-    app_cfg = netcfgbu_config.load(
-        fileio=cli_opts['config']
-    )
+    app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
 
-    inventory_recs = netcfgbu.inventory.load(
-        app_cfg=app_cfg,
-        limits=cli_opts['limit']
-    )
+    inventory_recs = netcfgbu.inventory.load(app_cfg=app_cfg, limits=cli_opts["limit"])
 
+    exec_backup(app_cfg=app_cfg, inventory_recs=inventory_recs, cli_opts=cli_opts)
 
-@cli.command(name='probe')
+                           
+@cli.command(name="probe")
 @opt_config_file
-@click.option(
-    '--limit', '-l',
-    multiple=True,
-    help="limit inventory",
-
-)
+@opt_limits
 def cli_check(**cli_opts):
     """
     Probe each device for SSH reachablility.
@@ -215,19 +329,14 @@ def cli_check(**cli_opts):
     The probe check determines if the device is reachable and the SSH port
     is available to receive connections.
     """
-    app_cfg = netcfgbu_config.load(
-        fileio=cli_opts['config']
-    )
+    app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
 
-    if not cli_opts['limit']:
-        value = click.prompt('Process full inventory, are you sure? [n/Y]', default='n')
-        if value != 'Y':
+    if not cli_opts["limit"]:
+        value = click.prompt("Process full inventory, are you sure? [n/Y]", default="n")
+        if value != "Y":
             sys.exit("aborting.")
 
-    inventory_recs = netcfgbu.inventory.load(
-        app_cfg=app_cfg,
-        limits=cli_opts['limit']
-    )
+    inventory_recs = netcfgbu.inventory.load(app_cfg=app_cfg, limits=cli_opts["limit"])
 
     if not inventory_recs:
         sys.exit("No inventory matching limits.")
@@ -235,30 +344,59 @@ def cli_check(**cli_opts):
     exec_probe(inventory_recs)
 
 
-@cli.command(name='inventory')
+@cli.command(name="inventory")
 @opt_config_file
-@click.option(
-    '--limit', '-l',
-    multiple=True,
-    help="limit inventory",
-
-)
+@opt_limits
+@click.option("--brief", is_flag=True)
 def cli_inventory(**cli_opts):
 
-    app_cfg = netcfgbu_config.load(
-        fileio=cli_opts['config']
+    app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
+
+    inventory_recs = netcfgbu.inventory.load(app_cfg=app_cfg, limits=cli_opts["limit"])
+
+    os_names = Counter(rec["os_name"] for rec in inventory_recs)
+
+    os_name_table = indent(
+        tabulate(
+            headers=["os_name", "count"],
+            tabular_data=sorted(os_names.items(), key=itemgetter(1), reverse=True),
+        ),
+        SPACES_4,
     )
 
-    inventory_recs = netcfgbu.inventory.load(
-        app_cfg=app_cfg,
-        limits=cli_opts['limit']
+    print(LN_SEP)
+    print(
+        f"""
+SUMMARY: TOTAL={len(inventory_recs)}
+BY OS-NAME:
+{os_name_table}
+"""
     )
 
-    print(tabulate(
-        headers=["host", "os_name"],
-        tabular_data=[[rec['host'], rec['os_name']] for rec in inventory_recs]
-    ))
+    if cli_opts["brief"] is True:
+        return
+
+    print(
+        tabulate(
+            headers=["host", "os_name"],
+            tabular_data=[[rec["host"], rec["os_name"]] for rec in inventory_recs],
+        )
+    )
 
 
-if __name__ == '__main__':
+@cli.command(name="login")
+@opt_config_file
+@opt_limits
+@opt_batch
+def cli_login(**cli_opts):
+    """
+    Verify SSH login to devices.
+    """
+    app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
+    inventory_recs = netcfgbu.inventory.load(app_cfg=app_cfg, limits=cli_opts["limit"])
+
+    exec_test_login(app_cfg, inventory_recs, cli_opts)
+
+
+if __name__ == "__main__":
     cli()

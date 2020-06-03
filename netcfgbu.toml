@@ -22,9 +22,9 @@ password = "$NETWORK_PASSWORD"
 # -----------------------------------------------------------------------------
 
 
-[logging.loggers.netcfgbu]
-    handlers = ["console"]
-    level = "INFO"
+#[logging.loggers.netcfgbu2]
+#    handlers = ["console"]
+#    level = "INFO"
 
 [logging.handlers.console]
     class = "logging.StreamHandler"

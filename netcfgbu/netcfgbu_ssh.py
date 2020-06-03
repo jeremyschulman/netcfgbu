@@ -1,14 +1,14 @@
+from typing import Optional
 import re
 import asyncssh
 import io
 import asyncio
 from pathlib import Path
 from copy import copy
-import logging
-from typing import Coroutine
 
+import aiofiles
 
-_LOG = logging.getLogger(__package__)
+from . logger import get_logger
 
 
 class ConfigBackupSSHSpec(object):
@@ -40,7 +40,7 @@ class ConfigBackupSSHSpec(object):
         when the show-running command is executed the output will not be
         blocked with a "--More--" user prompt.
     """
-    PROMPT_PATTERN = re.compile(r"^\r?([a-z0-9.\-@()/:]{1,32}\s*[#>$])\s*$", flags=(re.M | re.I))
+    PROMPT_PATTERN = re.compile(r"^\r?([a-z0-9.\-_@()/:]{1,32}\s*[#>$])\s*$", flags=(re.M | re.I))
 
     show_running = 'show running-config'
     disable_paging = None
@@ -65,6 +65,7 @@ class ConfigBackupSSHSpec(object):
         self.name = host_cfg.get('host') or host_cfg.get('ipaddr')
         self.app_cfg = app_cfg
         self.os_spec = copy(os_spec)
+        self.log = get_logger()
 
         if self.disable_paging and 'disable_paging' not in os_spec:
             self.os_spec['disable_paging'] = self.disable_paging
@@ -83,7 +84,11 @@ class ConfigBackupSSHSpec(object):
         self.conn = None
         self.process = None
 
-        _LOG.info(f"INIT-READY: {self.name} ({self.os_name})")
+    # -------------------------------------------------------------------------
+    #
+    #                       Backup Config Coroutine Task
+    #
+    # -------------------------------------------------------------------------
 
     async def backup_config(self):
         """
@@ -99,13 +104,76 @@ class ConfigBackupSSHSpec(object):
         """
 
         await self.login()
-        await self.get_running_config()
-        self.close()
+        try:
+            await self.get_running_config()
+
+        except Exception as exc:
+            await self.log.error(f"BACKUP FAILED: {str(exc)}")
+
+        finally:
+            await self.close()
 
         if self.config:
             await self.save_config()
 
         return self
+
+    # -------------------------------------------------------------------------
+    #
+    #                       Test Login Coroutine Task
+    #
+    # -------------------------------------------------------------------------
+
+    async def test_login(self) -> Optional[str]:
+        try:
+            await self.login()
+            await self.close()
+            return self.conn_args['username']
+
+        except asyncssh.PermissionDenied:
+            return None
+
+    # -------------------------------------------------------------------------
+    #
+    #                            Get Configuration
+    #
+    # -------------------------------------------------------------------------
+
+    async def get_running_config(self):
+        command = self.show_running
+
+        if not self.process:
+            self.log.info(f"GET-CONFIG: {self.name}")
+            res = await self.conn.run(command)
+            self.conn.close()
+            ln_at = res.stdout.find(command) + len(command) + 1
+            self.config = res.stdout[ln_at:]
+            return
+
+        at_prompt = False
+        paging_disabled = False
+
+        try:
+            await asyncio.wait_for(self.read_until_prompt(), timeout=30)
+            at_prompt = True
+
+            await asyncio.wait_for(self.run_disable_paging(), timeout=30)
+            paging_disabled = True
+
+            self.log.info(f"GET-CONFIG: {self.name}")
+            self.config = await asyncio.wait_for(self.run_command(command), timeout=120)
+
+        except asyncio.TimeoutError:
+            raise RuntimeError(
+                f'Timeout when getting running configuraiton',
+                dict(at_prompt=at_prompt, paging_disabled=paging_disabled)
+            )
+
+    # -------------------------------------------------------------------------
+    #
+    #                            Login / Close
+    #
+    # -------------------------------------------------------------------------
 
     async def login(self) -> None:
         """
@@ -126,6 +194,8 @@ class ConfigBackupSSHSpec(object):
             When none of the provided credentials result in a successful login.
 
         """
+        await self.log.info(f"LOGIN: {self.name} ({self.os_name})")
+
         creds = copy(self.app_cfg['credentials'])
 
         # if there are host specific credentials, then try these first.
@@ -141,6 +211,7 @@ class ConfigBackupSSHSpec(object):
                 self.failed = None
                 self.conn_args.update(try_cred)
                 self.conn = await asyncio.wait_for(asyncssh.connect(**self.conn_args), timeout=60)
+                await self.log.info(f"CONNECTED: {self.name}")
 
                 if (
                     'disable_paging' in self.os_spec or
@@ -148,7 +219,6 @@ class ConfigBackupSSHSpec(object):
                 ):
                     self.process = await self.conn.create_process(term_type='vt100')
 
-                _LOG.info(f"CONNECTED: {self.name}")
                 return self.conn
 
             except asyncssh.PermissionDenied as exc:
@@ -159,11 +229,20 @@ class ConfigBackupSSHSpec(object):
             reason='Bad username/password'
         )
 
-    def close(self):
-        if self.process:
-            self.process.terminate()
+    async def close(self):
+        # TODO: not sure if I need to do this or not
+        # if self.process:
+        #     self.process.terminate()
 
         self.conn.close()
+        await self.conn.wait_closed()
+        await self.log.info(f"CLOSED: {self.name}")
+
+    # -------------------------------------------------------------------------
+    #
+    #                                    Helpers
+    #
+    # -------------------------------------------------------------------------
 
     async def read_until_prompt(self):
         output = ''
@@ -184,32 +263,7 @@ class ConfigBackupSSHSpec(object):
             if nl_at > 0 and self.PROMPT_PATTERN.match(output[nl_at + 1:]):
                 return output[len(wr_cmd) + 1:nl_at]
 
-    async def save_config(self):
-        self.save_file = Path(self.app_cfg['defaults']['configs_dir']) / f"{self.name}.cfg"
-        with self.save_file.open("w+") as ofile:
-            ofile.write(self.config)
-            ofile.write("\n")
-
-
-
-    async def get_running_config(self):
-        command = self.show_running
-
-        if not self.process:
-            _LOG.info(f"GET-CONFIG: {self.name}")
-            res = await self.conn.run(command)
-            self.conn.close()
-            ln_at = res.stdout.find(command) + len(command) + 1
-            self.config = res.stdout[ln_at:]
-            return
-
-        await self.read_until_prompt()
-        await self.run_disable_paging()
-        _LOG.info(f"GET-CONFIG: {self.name}")
-        result = await self.run_command(command)
-        self.config = result.replace("\r", "")
-
-    async def run_disable_paging(self) -> Coroutine:
+    async def run_disable_paging(self):
         """
         This coroutine is used to execute each of the `disable_paging` commands
         so that the CLI will not prompt for "--More--" output.
@@ -222,3 +276,15 @@ class ConfigBackupSSHSpec(object):
         for cmd in disable_paging_commands:
             # TODO: need to check result for errors
             await self.run_command(cmd)
+
+    # -------------------------------------------------------------------------
+    #
+    #                         Store Config to Filesystem
+    #
+    # -------------------------------------------------------------------------
+
+    async def save_config(self):
+        self.save_file = Path(self.app_cfg['defaults']['configs_dir']) / f"{self.name}.cfg"
+        async with aiofiles.open('filename', mode='w+') as ofile:
+            await ofile.write(self.config.replace("\r", ""))
+            await ofile.write("\n")
