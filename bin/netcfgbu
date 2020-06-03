@@ -94,6 +94,8 @@ def print_report(report, total_n):
     def err_reason(exc):
         if isinstance(exc, OSError):
             return errorcode[exc.errno]
+        elif isinstance(exc, asyncio.TimeoutError):
+            return "TIMEOUT - device failed to connect via SSH"
         else:
             return "%s: %s" % (str(exc.__class__.__name__), str(exc))
 
