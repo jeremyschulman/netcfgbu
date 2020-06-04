@@ -13,8 +13,9 @@ password = "$NETWORK_PASSWORD"
     disable_paging = 'terminal pager 0'
 
 [os_specs.aireos]
-    class = "netcfgbu.os_specs.cisco.CiscoWLCSSHSpec"
-
+    show_running = "show run-config commands"
+    disable_paging = "config paging disable"
+    connection = "netcfgbu.os_specs.ssh.LoginPromoptUserPass"
 
 # -----------------------------------------------------------------------------
 # Logging - follows Python format as described

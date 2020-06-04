@@ -9,14 +9,11 @@ import aiofiles
 import asyncssh
 
 
-from . logger import get_logger
+from .logger import get_logger
 from . import consts
 
 
-__all__ = [
-    'ConfigBackupSSHSpec',
-    'set_max_startups'
-]
+__all__ = ["ConfigBackupSSHSpec", "set_max_startups"]
 
 
 class ConfigBackupSSHSpec(object):
@@ -48,19 +45,17 @@ class ConfigBackupSSHSpec(object):
         when the show-running command is executed the output will not be
         blocked with a "--More--" user prompt.
     """
-    PROMPT_PATTERN = re.compile(r"^\r?([a-z0-9.\-_@()/:]{1,32}\s*[#>$])\s*$", flags=(re.M | re.I))
 
-    show_running = 'show running-config'
+    PROMPT_PATTERN = re.compile(
+        r"^\r?([a-z0-9.\-_@()/:]{1,32}\s*[#>$])\s*$", flags=(re.M | re.I)
+    )
+
+    show_running = "show running-config"
     disable_paging = None
 
     _max_startups_sem4 = asyncio.Semaphore(consts.DEFAULT_MAX_STARTUPS)
 
-    def __init__(
-        self,
-        host_cfg: dict,
-        os_spec: dict,
-        app_cfg: dict
-    ):
+    def __init__(self, host_cfg: dict, os_spec: dict, app_cfg: dict):
         """
         Initialize the backup spec with information about the host, the os_spec assigned
         to the host, and the command app configuration.
@@ -72,19 +67,18 @@ class ConfigBackupSSHSpec(object):
         app_cfg
         """
         self.host_cfg = host_cfg
-        self.name = host_cfg.get('host') or host_cfg.get('ipaddr')
+        self.name = host_cfg.get("host") or host_cfg.get("ipaddr")
         self.app_cfg = app_cfg
         self.os_spec = copy(os_spec)
         self.log = get_logger()
 
-        if self.disable_paging and 'disable_paging' not in os_spec:
-            self.os_spec['disable_paging'] = self.disable_paging
-
-        self.os_name = host_cfg['os_name']
+        self.os_spec.setdefault("disable_paging", self.disable_paging)
+        self.os_spec.setdefault("show_running", self.show_running)
+        self.os_name = host_cfg["os_name"]
 
         self.conn_args = {
-            'host': self.host_cfg.get('ipaddr') or self.host_cfg.get('host'),
-            'known_hosts': None
+            "host": self.host_cfg.get("ipaddr") or self.host_cfg.get("host"),
+            "known_hosts": None,
         }
 
         self._cur_prompt: Optional[str] = None
@@ -144,7 +138,7 @@ class ConfigBackupSSHSpec(object):
 
         try:
             async with await self.login():
-                login_as = self.conn_args['username']
+                login_as = self.conn_args["username"]
 
         except asyncssh.PermissionDenied:
             pass
@@ -158,7 +152,7 @@ class ConfigBackupSSHSpec(object):
     # -------------------------------------------------------------------------
 
     async def get_running_config(self):
-        command = self.show_running
+        command = self.os_spec["show_running"]
 
         if not self.process:
             self.log.info(f"GET-CONFIG: {self.name}")
@@ -172,10 +166,10 @@ class ConfigBackupSSHSpec(object):
         paging_disabled = False
 
         try:
-            await asyncio.wait_for(self.read_until_prompt(), timeout=30)
+            await asyncio.wait_for(self.read_until_prompt(), timeout=10)
             at_prompt = True
 
-            await asyncio.wait_for(self.run_disable_paging(), timeout=30)
+            await asyncio.wait_for(self.run_disable_paging(), timeout=10)
             paging_disabled = True
 
             self.log.info(f"GET-CONFIG: {self.name}")
@@ -183,13 +177,13 @@ class ConfigBackupSSHSpec(object):
 
         except asyncio.TimeoutError:
             raise RuntimeError(
-                f'Timeout when getting running configuraiton',
-                dict(at_prompt=at_prompt, paging_disabled=paging_disabled)
+                f"Timeout when getting running configuraiton",
+                dict(at_prompt=at_prompt, paging_disabled=paging_disabled),
             )
 
     # -------------------------------------------------------------------------
     #
-    #                            Login / Close
+    #                                  Login
     #
     # -------------------------------------------------------------------------
 
@@ -221,12 +215,14 @@ class ConfigBackupSSHSpec(object):
             When attempting to connect to a device exceeds the timeout value.
         """
 
-        creds = copy(self.app_cfg['credentials'])
+        creds = copy(self.app_cfg["credentials"])
 
         # if there are host specific credentials, then try these first.
 
-        host_creds = dict(username=self.host_cfg.get('username'),
-                          password=self.host_cfg.get('password'))
+        host_creds = dict(
+            username=self.host_cfg.get("username"),
+            password=self.host_cfg.get("password"),
+        )
 
         if all(host_creds.values()):
             creds.insert(0, host_creds)
@@ -244,18 +240,19 @@ class ConfigBackupSSHSpec(object):
                 self.conn_args.update(try_cred)
                 async with self.__class__._max_startups_sem4:
 
-                    login_msg = (f"LOGIN: {self.name} ({self.os_name}) "
-                                 f"as {self.conn_args['username']}")
+                    login_msg = (
+                        f"LOGIN: {self.name} ({self.os_name}) "
+                        f"as {self.conn_args['username']}"
+                    )
 
                     self.log.info(login_msg)
-                    self.conn = await asyncio.wait_for(asyncssh.connect(**self.conn_args), timeout=60)
+                    self.conn = await asyncio.wait_for(
+                        asyncssh.connect(**self.conn_args), timeout=60
+                    )
                     self.log.info(f"CONNECTED: {self.name}")
 
-                    if (
-                        'disable_paging' in self.os_spec or
-                        self.disable_paging
-                    ):
-                        self.process = await self.conn.create_process(term_type='vt100')
+                    if "disable_paging" in self.os_spec or self.disable_paging:
+                        self.process = await self.conn.create_process(term_type="vt100")
 
                     return self.conn
 
@@ -267,7 +264,7 @@ class ConfigBackupSSHSpec(object):
         # attempts.
 
         raise asyncssh.PermissionDenied(
-            reason=f'No valid username/password ({len(creds)})'
+            reason=f"No valid username/password ({len(creds)})"
         )
 
     async def close(self):
@@ -282,11 +279,11 @@ class ConfigBackupSSHSpec(object):
     # -------------------------------------------------------------------------
 
     async def read_until_prompt(self):
-        output = ''
+        output = ""
         while True:
             output += await self.process.stdout.read(io.DEFAULT_BUFFER_SIZE)
-            nl_at = output.rfind('\n')
-            if mobj := self.PROMPT_PATTERN.match(output[nl_at + 1:]):
+            nl_at = output.rfind("\n")
+            if mobj := self.PROMPT_PATTERN.match(output[nl_at + 1 :]):
                 self._cur_prompt = mobj.group(1)
                 return output[0:nl_at]
 
@@ -294,7 +291,7 @@ class ConfigBackupSSHSpec(object):
         wr_cmd = command + "\n"
         self.process.stdin.write(wr_cmd)
         output = await self.read_until_prompt()
-        return output[len(wr_cmd) + 1:]
+        return output[len(wr_cmd) + 1 :]
 
     async def run_disable_paging(self):
         """
@@ -302,7 +299,7 @@ class ConfigBackupSSHSpec(object):
         so that the CLI will not prompt for "--More--" output.
         """
 
-        disable_paging_commands = self.os_spec['disable_paging']
+        disable_paging_commands = self.os_spec["disable_paging"]
         if not isinstance(disable_paging_commands, list):
             disable_paging_commands = [disable_paging_commands]
 
@@ -317,8 +314,10 @@ class ConfigBackupSSHSpec(object):
     # -------------------------------------------------------------------------
 
     async def save_config(self):
-        self.save_file = Path(self.app_cfg['defaults']['configs_dir']) / f"{self.name}.cfg"
-        async with aiofiles.open(self.save_file, mode='w+') as ofile:
+        self.save_file = (
+            Path(self.app_cfg["defaults"]["configs_dir"]) / f"{self.name}.cfg"
+        )
+        async with aiofiles.open(self.save_file, mode="w+") as ofile:
             await ofile.write(self.config.replace("\r", ""))
             await ofile.write("\n")
 

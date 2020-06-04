@@ -1,6 +1,6 @@
 import asyncio
 
-__all__ = ['probe']
+__all__ = ["probe"]
 
 
 async def probe(host, port=22, timeout=10) -> bool:

@@ -1,5 +1,13 @@
+"""
+
+References
+----------
+
+Logging in asyncio applications
+   https://bit.ly/36WWgrf
+"""
+from typing import Set
 import sys
-from typing import Set, Optional
 import asyncio
 from queue import SimpleQueue as Queue
 
@@ -9,9 +17,10 @@ import logging
 import logging.handlers
 
 
-__all__ = ['get_logger']
+__all__ = ["get_logger", "stop_aiologging"]
 
-_g_log_que_listener: Optional[logging.handlers.QueueListener] = None
+
+_g_quelgr_listener: logging.handlers.QueueListener
 
 
 class LocalQueueHandler(logging.handlers.QueueHandler):
@@ -34,8 +43,7 @@ def setup_logging_queue(logger_names) -> None:
     Replace all configured handlers with a LocalQueueHandler, and start a
     logging.QueueListener holding the original handlers.
     """
-    global _g_log_que_listener
-
+    global _g_quelgr_listener
     queue = Queue()
     handlers: Set[logging.Handler] = set()
     que_handler = LocalQueueHandler(queue)
@@ -48,28 +56,29 @@ def setup_logging_queue(logger_names) -> None:
                 lgr.removeHandler(h)
                 handlers.add(h)
 
-    _g_log_que_listener = logging.handlers.QueueListener(
-        queue, *handlers,
-        respect_handler_level=True
+    _g_quelgr_listener = logging.handlers.QueueListener(
+        queue, *handlers, respect_handler_level=True
     )
-
-    _g_log_que_listener.start()
+    _g_quelgr_listener.start()
 
 
 def setup_logging(app_cfg):
-    if (log_cfg := app_cfg.get('logging')) is None:
-        return
+    log_cfg = app_cfg.get("logging") or {}
 
-    log_cfg['version'] = 1
+    # std_lgr = get_stdout_logger()
+    # std_lgr.addHandler(logging.StreamHandler())
+    # std_lgr.handlers[0].setFormatter(logging.Formatter(fmt="%(message)s"))
+    # std_lgr.setLevel(logging.INFO)
+    #
+    # log_cfg['loggers'][STDOUT_LGR] ={}
+
+    log_cfg["version"] = 1
     dictConfig(log_cfg)
-    setup_logging_queue(log_cfg['loggers'])
+    setup_logging_queue(log_cfg["loggers"])
 
 
-def stop_qlogging():
-    if not _g_log_que_listener:
-        return
-
-    _g_log_que_listener.stop()
+def stop_aiologging():
+    _g_quelgr_listener.stop()
     sys.stdout.flush()
 
 
