@@ -1,7 +1,7 @@
-from netcfgbu.netcfgbu_ssh import ConfigBackupSSHSpec
+from netcfgbu.connectors.basic import BasicSSHConnector
 
 
-class LoginPromoptUserPass(ConfigBackupSSHSpec):
+class LoginPromoptUserPass(BasicSSHConnector):
     async def login(self):
         await super(LoginPromoptUserPass, self).login()
         await self.process.stdout.readuntil("User:")

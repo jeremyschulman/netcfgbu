@@ -1,6 +1,7 @@
 from typing import Optional
 import asyncio
 import io
+from os.path import expandvars
 from pathlib import Path
 import re
 from copy import copy
@@ -9,25 +10,25 @@ import aiofiles
 import asyncssh
 
 
-from .logger import get_logger
-from . import consts
+from netcfgbu.logger import get_logger
+from netcfgbu import consts
 
 
-__all__ = ["ConfigBackupSSHSpec", "set_max_startups"]
+__all__ = ["BasicSSHConnector", "set_max_startups"]
 
 
-class ConfigBackupSSHSpec(object):
+class BasicSSHConnector(object):
     """
-    The ConfigBackupSSHSpec class is used to define and process the
+    The BasicSSHConnector class is used to define and process the
     configuration file backup process over SSH.  The primary usage is to
     initialize the class with the host configuration, the operating system
     specification, and the application configuration.  Once initialized the
     Caller should await on `backup_config()` to execute the backup process.
 
-    If the ConfigBackupSSHSpec defines `disable_paging` will execute those
+    If the BasicSSHConnector defines `disable_paging` will execute those
     commands before executinig the `show_running` command.
 
-    If the ConfigBackupSSHSpec does not define the `disable_paging` attribute,
+    If the BasicSSHConnector does not define the `disable_paging` attribute,
     then only the `show_running` command will be executed.
 
 
@@ -107,7 +108,7 @@ class ConfigBackupSSHSpec(object):
 
         Returns
         -------
-        ConfigBackupSSHSpec
+        BasicSSHConnector
             Instance of self so that information about the process can be
             examined once the backup process completes, or fails.
         """
@@ -187,6 +188,36 @@ class ConfigBackupSSHSpec(object):
     #
     # -------------------------------------------------------------------------
 
+    def _setup_creds(self):
+        creds = list()
+
+        # if the inventory host item defines a username/password, then use that
+        # first
+
+        if all(key in self.host_cfg for key in ("username", "password")):
+            creds.append(
+                dict(
+                    username=self.host_cfg.get("username"),
+                    password=expandvars(self.host_cfg.get("password")),
+                )
+            )
+
+        # add the default credentials
+
+        creds.append(
+            dict(
+                username=self.app_cfg["defaults"]["username"],
+                password=self.app_cfg["defaults"]["password"],
+            )
+        )
+
+        # add any additional credentials defined in the config-file
+
+        if "credentials" in self.app_cfg:
+            creds.extend(self.app_cfg["credentials"])
+
+        return creds
+
     async def login(self):
         """
         This coroutine is used to execute the SSH login process to the target device.
@@ -215,17 +246,7 @@ class ConfigBackupSSHSpec(object):
             When attempting to connect to a device exceeds the timeout value.
         """
 
-        creds = copy(self.app_cfg["credentials"])
-
-        # if there are host specific credentials, then try these first.
-
-        host_creds = dict(
-            username=self.host_cfg.get("username"),
-            password=self.host_cfg.get("password"),
-        )
-
-        if all(host_creds.values()):
-            creds.insert(0, host_creds)
+        creds = self._setup_creds()
 
         # TODO:
         #       if there are os_spec specific credentials then add those next
@@ -322,5 +343,5 @@ class ConfigBackupSSHSpec(object):
             await ofile.write("\n")
 
 
-def set_max_startups(count, cls=ConfigBackupSSHSpec):
+def set_max_startups(count, cls=BasicSSHConnector):
     cls.set_max_startups(count)

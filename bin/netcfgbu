@@ -11,7 +11,6 @@ from collections import defaultdict, Counter
 from errno import errorcode
 from operator import itemgetter
 from textwrap import indent
-from itertools import zip_longest
 
 # -----------------------------------------------------------------------------
 # Public Imports
@@ -25,8 +24,8 @@ from tabulate import tabulate
 # -----------------------------------------------------------------------------
 
 import netcfgbu
-from netcfgbu.netcfgbu_ssh import ConfigBackupSSHSpec, set_max_startups
 from netcfgbu import netcfgbu_config
+from netcfgbu.connectors import set_max_startups
 from netcfgbu.os_specs import make_host_os_spec
 from netcfgbu.logger import get_logger, stop_aiologging
 from netcfgbu.probe import probe
@@ -267,6 +266,9 @@ def cli():
 @opt_limits
 @opt_batch
 def cli_backup(**cli_opts):
+    """
+    Backup network configurations.
+    """
     app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
 
     inventory_recs = netcfgbu.inventory.load(app_cfg=app_cfg, limits=cli_opts["limit"])
@@ -283,7 +285,7 @@ def cli_backup(**cli_opts):
 @opt_limits
 def cli_check(**cli_opts):
     """
-    Probe each device for SSH reachablility.
+    Probe device for SSH reachablility.
 
     The probe check determines if the device is reachable and the SSH port
     is available to receive connections.
@@ -329,6 +331,9 @@ def cli_login(**cli_opts):
 
 @cli.group(name="inventory")
 def cli_inventory():
+    """
+    [ls, build, ...]
+    """
     pass
 
 
