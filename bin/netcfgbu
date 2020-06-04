@@ -24,7 +24,7 @@ from tabulate import tabulate
 # -----------------------------------------------------------------------------
 
 import netcfgbu
-from netcfgbu import netcfgbu_config
+from netcfgbu import config
 from netcfgbu.connectors import set_max_startups
 from netcfgbu.os_specs import make_host_os_spec
 from netcfgbu.logger import get_logger, stop_aiologging
@@ -248,7 +248,7 @@ def exec_probe(inventory):
 class WithConfigCommand(click.Command):
     def invoke(self, ctx):
         try:
-            ctx.obj["app_cfg"] = netcfgbu_config.load(fileio=ctx.params["config"])
+            ctx.obj["app_cfg"] = config.load(fileio=ctx.params["config"])
 
         except Exception as exc:
             ctx.fail(exc.args[0])
@@ -260,15 +260,18 @@ class WithInventoryCommand(click.Command):
     def invoke(self, ctx):
 
         try:
-            app_cfg = ctx.obj["app_cfg"] = netcfgbu_config.load(
+            app_cfg = ctx.obj["app_cfg"] = config.load(
                 fileio=ctx.params["config"]
             )
             ctx.obj["inventory_recs"] = netcfgbu.inventory.load(
                 app_cfg=app_cfg, limits=ctx.params["limit"]
             )
 
+        except FileNotFoundError as exc:
+            sys.exit(f"File not found: {exc.filename}")
+
         except Exception as exc:
-            ctx.fail(exc.args[0])
+            ctx.fail(f"ERROR: {exc.args[0]}")
 
         if not ctx.obj["inventory_recs"]:
             sys.exit("No inventory matching limits.")
@@ -365,7 +368,7 @@ def cli_inventory():
 @cli_inventory.command("ls", cls=WithInventoryCommand)
 @opt_config_file
 @opt_limits
-@click.option("--brief", is_flag=True)
+@click.option("--brief", '-b', is_flag=True)
 @click.pass_context
 def cli_inventory_list(ctx, **cli_opts):
 
@@ -384,7 +387,7 @@ def cli_inventory_list(ctx, **cli_opts):
     print(
         f"""
 SUMMARY: TOTAL={len(inventory_recs)}
-BY OS-NAME:
+
 {os_name_table}
 """
     )
@@ -413,7 +416,7 @@ def cli_inventory_build(**cli_opts):
     """
     from netcfgbu.cli.inventory import build
 
-    app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
+    app_cfg = config.load(fileio=cli_opts["config"])
     try:
         inv_df = app_cfg["inventory"][0]
     except IndexError:
