@@ -153,8 +153,7 @@ Generally each of these variables is a single command, for example:
 If you need to provide multiple commands, define a list of commands, as described
 [TOML Array](https://github.com/toml-lang/toml#user-content-array).
 
-#### Additional Credentials
-
+#### Global Credentials
 You can define additional credentials to try should the default fail.  You can
 defined multiple credentials using the TOML [Array of
 Tables](https://github.com/toml-lang/toml#user-content-array-of-tables)
@@ -170,6 +169,20 @@ password = "$ENABLE_PASSWORD"
 [[credentials]]
 username = "superadmin"
 password = "$ENABLE_PASSWORD_1999"
+```
+
+#### OS Specific Credentials
+You can define one or more credentials within the OS specifications blocks.  If you provide more than
+one credential, then they are tried in the order supplied in the configuration file. 
+
+Example:
+```toml
+[os_name.asa]
+    disable_paging = 'terminal pager 0'
+
+    [[os_name.asa.credentials]]
+    username = 'superBadSecOps'
+    password = '$SECOPS_PASSWORD'
 ```
 
 #### Changing Storage Directory

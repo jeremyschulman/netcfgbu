@@ -64,7 +64,7 @@ def err_reason(exc):
     if isinstance(exc, OSError):
         return errorcode[exc.errno]
     elif isinstance(exc, asyncio.TimeoutError):
-        return "TIMEOUT - device failed to connect via SSH"
+        return "TIMEOUT%s" % (str(exc.args or ""))
     else:
         return "%s: %s" % (str(exc.__class__.__name__), str(exc))
 
@@ -132,9 +132,13 @@ def exec_backup(app_cfg, inventory_recs, cli_opts):
             msg = f"DONE ({done}/{total}): {rec['host']} "
 
             try:
-                task.result()
-                log.info(msg + ": OK")
-                report['ok'].append(rec)
+                res = task.result()
+                if res is not True:
+                    log.info(": ERROR: %s" % err_reason(res))
+                    report["fail"].append(rec)
+                else:
+                    log.info(msg + ": OK")
+                    report["ok"].append(rec)
 
             except Exception as exc:
                 report["error"].append((rec, exc))
@@ -187,7 +191,7 @@ def exec_test_login(app_cfg, inventory_recs, cli_opts):
             except Exception as exc:
                 if isinstance(exc, asyncio.TimeoutError):
                     log.warning(msg + "Timeout")
-                    report['fail'].append(rec)
+                    report["fail"].append(rec)
                 else:
                     report["error"].append((rec, exc))
                     log.error(msg + f": {err_reason(exc)}")
@@ -241,8 +245,39 @@ def exec_probe(inventory):
 # -----------------------------------------------------------------------------
 
 
+class WithConfigCommand(click.Command):
+    def invoke(self, ctx):
+        try:
+            ctx.obj["app_cfg"] = netcfgbu_config.load(fileio=ctx.params["config"])
+
+        except Exception as exc:
+            ctx.fail(exc.args[0])
+
+        super().invoke(ctx)
+
+
+class WithInventoryCommand(click.Command):
+    def invoke(self, ctx):
+
+        try:
+            app_cfg = ctx.obj["app_cfg"] = netcfgbu_config.load(
+                fileio=ctx.params["config"]
+            )
+            ctx.obj["inventory_recs"] = netcfgbu.inventory.load(
+                app_cfg=app_cfg, limits=ctx.params["limit"]
+            )
+
+        except Exception as exc:
+            ctx.fail(exc.args[0])
+
+        if not ctx.obj["inventory_recs"]:
+            sys.exit("No inventory matching limits.")
+
+        super().invoke(ctx)
+
+
 opt_config_file = click.option(
-    "-C", "--config", envvar="NETCFGBU_CONFIG", type=click.File()
+    "-C", "--config", envvar="NETCFGBU_CONFIG", type=click.File(), required=True
 )
 
 opt_limits = click.option("--limit", "-l", multiple=True, help="limit inventory",)
@@ -261,18 +296,20 @@ def cli():
     pass
 
 
-@cli.command(name="backup")
+@cli.command(name="backup", cls=WithInventoryCommand)
 @opt_config_file
 @opt_limits
 @opt_batch
-def cli_backup(**cli_opts):
+@click.pass_context
+def cli_backup(ctx, **cli_opts):
     """
     Backup network configurations.
     """
-    app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
-
-    inventory_recs = netcfgbu.inventory.load(app_cfg=app_cfg, limits=cli_opts["limit"])
-    exec_backup(app_cfg=app_cfg, inventory_recs=inventory_recs, cli_opts=cli_opts)
+    exec_backup(
+        app_cfg=ctx.obj["app_cfg"],
+        inventory_recs=ctx.obj["inventory_recs"],
+        cli_opts=cli_opts,
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -280,29 +317,18 @@ def cli_backup(**cli_opts):
 # -----------------------------------------------------------------------------
 
 
-@cli.command(name="probe")
+@cli.command(name="probe", cls=WithInventoryCommand)
 @opt_config_file
 @opt_limits
-def cli_check(**cli_opts):
+@click.pass_context
+def cli_check(ctx, **cli_opts):
     """
     Probe device for SSH reachablility.
 
     The probe check determines if the device is reachable and the SSH port
     is available to receive connections.
     """
-    app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
-
-    if not cli_opts["limit"]:
-        value = click.prompt("Process full inventory, are you sure? [n/Y]", default="n")
-        if value != "Y":
-            sys.exit("aborting.")
-
-    inventory_recs = netcfgbu.inventory.load(app_cfg=app_cfg, limits=cli_opts["limit"])
-
-    if not inventory_recs:
-        sys.exit("No inventory matching limits.")
-
-    exec_probe(inventory_recs)
+    exec_probe(ctx.obj["inventory_recs"])
 
 
 # -----------------------------------------------------------------------------
@@ -310,18 +336,17 @@ def cli_check(**cli_opts):
 # -----------------------------------------------------------------------------
 
 
-@cli.command(name="login")
+@cli.command(name="login", cls=WithInventoryCommand)
 @opt_config_file
 @opt_limits
 @opt_batch
-def cli_login(**cli_opts):
+@click.pass_context
+def cli_login(ctx, **cli_opts):
     """
     Verify SSH login to devices.
     """
-    app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
-    inventory_recs = netcfgbu.inventory.load(app_cfg=app_cfg, limits=cli_opts["limit"])
 
-    exec_test_login(app_cfg, inventory_recs, cli_opts)
+    exec_test_login(ctx.obj["app_cfg"], ctx.obj["inventory_recs"], cli_opts)
 
 
 # -----------------------------------------------------------------------------
@@ -337,16 +362,14 @@ def cli_inventory():
     pass
 
 
-@cli_inventory.command("ls")
+@cli_inventory.command("ls", cls=WithInventoryCommand)
 @opt_config_file
 @opt_limits
 @click.option("--brief", is_flag=True)
-def cli_inventory_list(**cli_opts):
+@click.pass_context
+def cli_inventory_list(ctx, **cli_opts):
 
-    app_cfg = netcfgbu_config.load(fileio=cli_opts["config"])
-
-    inventory_recs = netcfgbu.inventory.load(app_cfg=app_cfg, limits=cli_opts["limit"])
-
+    inventory_recs = ctx.obj["inventory_recs"]
     os_names = Counter(rec["os_name"] for rec in inventory_recs)
 
     os_name_table = indent(
@@ -400,4 +423,4 @@ def cli_inventory_build(**cli_opts):
 
 
 if __name__ == "__main__":
-    cli()
+    cli(obj={})

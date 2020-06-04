@@ -16,9 +16,14 @@ class CommentedCsvReader(csv.DictReader):
 
 
 def load(app_cfg, limits=None):
-    inventory_file = Path(app_cfg["defaults"]["inventory"])
-    csv_rd = CommentedCsvReader(inventory_file.open())
 
+    inventory_file = Path(app_cfg["defaults"]["inventory"])
+    if not inventory_file.exists():
+        raise RuntimeError(
+            f"Inventory file does not exist: {inventory_file.absolute()}"
+        )
+
+    csv_rd = CommentedCsvReader(inventory_file.open())
     if limits:
         filter_fn = create_limit_filter(limits)
         return list(filter(filter_fn, csv_rd))
@@ -49,7 +54,7 @@ def create_limit_filter(limits):
     for limit_expr in limits:
         mo = limit_reg.match(limit_expr)
         if not mo:
-            raise ValueError(f"INVALID limit expression: {limit_expr}")
+            raise ValueError(f"Invalid limit expression: {limit_expr}")
 
         fieldn, value = mo.groupdict().values()
 
@@ -57,7 +62,7 @@ def create_limit_filter(limits):
             value_reg = re.compile(f"^{value}$", re.IGNORECASE)
 
         except re.error as exc:
-            raise ValueError(f"INVALID limit expression: {limit_expr}: {str(exc)}")
+            raise ValueError(f"Invalid limit expression: {limit_expr}: {str(exc)}")
 
         op_filters.append(mk_op_filter(value_reg, fieldn))
 

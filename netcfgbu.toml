@@ -1,8 +1,8 @@
 [defaults]
 inventory = "$PROJ_DIR/inventory.csv"
-username = "jeremy.schulman"
-password = "$NETWORK_PASSWORD"
 configs_dir = "$PROJ_DIR/configs"
+credentials.username = "$NETWORK_USERNAME"
+credentials.password = "$NETWORK_PASSWORD"
 
 
 [[inventory]]
@@ -12,9 +12,9 @@ configs_dir = "$PROJ_DIR/configs"
 #                           Credentials
 # -----------------------------------------------------------------------------
 
-[[credentials]]
-username = "superadmin"
-password = "$ENABLE_PASSWORD"
+#[[credentials]]
+#username = "superadmin"
+#password = "$ENABLE_PASSWORD"
 
 # -----------------------------------------------------------------------------
 #                       Network OS SPecifications
@@ -25,6 +25,9 @@ password = "$ENABLE_PASSWORD"
 
 [os_name.ios]
     disable_paging = "terminal length 0"
+#    [[os_name.ios.credentials]]
+#    username = 'bob'
+#    password = 'bob123'
 
 [os_name.nxos]
     show_running = 'show running-config | no-more'
@@ -36,6 +39,13 @@ password = "$ENABLE_PASSWORD"
     show_running = "show run-config commands"
     disable_paging = "config paging disable"
     connection = "netcfgbu.connectors.ssh.LoginPromoptUserPass"
+
+[os_name.panos]
+    disable_paging = [
+        "set cli pager off",
+        "configure"
+    ]
+    show_running = "show"
 
 # -----------------------------------------------------------------------------
 # Logging - follows Python format as described

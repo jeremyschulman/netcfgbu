@@ -48,7 +48,11 @@ class BasicSSHConnector(object):
     """
 
     PROMPT_PATTERN = re.compile(
-        r"^\r?([a-z0-9.\-_@()/:]{1,32}\s*[#>$])\s*$", flags=(re.M | re.I)
+        "^\r?(["
+        + consts.PROMPT_VALID_CHARS
+        + "]{%s,%s}" % (1, consts.PROMPT_MAX_CHARS)
+        + r"\s*[#>$])\s*$",
+        flags=(re.M | re.I),
     )
 
     show_running = "show running-config"
@@ -116,9 +120,9 @@ class BasicSSHConnector(object):
         async with await self.login():
             try:
                 await self.get_running_config()
-
+                retval = True
             except Exception as exc:
-                self.log.error(f"BACKUP FAILED: {str(exc)}")
+                retval = exc
 
             finally:
                 await self.close()
@@ -126,7 +130,7 @@ class BasicSSHConnector(object):
         if self.config:
             await self.save_config()
 
-        return self
+        return retval
 
     # -------------------------------------------------------------------------
     #
@@ -154,9 +158,9 @@ class BasicSSHConnector(object):
 
     async def get_running_config(self):
         command = self.os_spec["show_running"]
+        self.log.info(f"GET-CONFIG: {self.name}")
 
         if not self.process:
-            self.log.info(f"GET-CONFIG: {self.name}")
             res = await self.conn.run(command)
             self.conn.close()
             ln_at = res.stdout.find(command) + len(command) + 1
@@ -174,10 +178,10 @@ class BasicSSHConnector(object):
             paging_disabled = True
 
             self.log.info(f"GET-CONFIG: {self.name}")
-            self.config = await asyncio.wait_for(self.run_command(command), timeout=120)
+            self.config = await asyncio.wait_for(self.run_command(command), timeout=60)
 
         except asyncio.TimeoutError:
-            raise RuntimeError(
+            raise asyncio.TimeoutError(
                 f"Timeout when getting running configuraiton",
                 dict(at_prompt=at_prompt, paging_disabled=paging_disabled),
             )
@@ -191,30 +195,25 @@ class BasicSSHConnector(object):
     def _setup_creds(self):
         creds = list()
 
-        # if the inventory host item defines a username/password, then use that
-        # first
-
+        # use credential from inventory host record first, if defined
         if all(key in self.host_cfg for key in ("username", "password")):
             creds.append(
                 dict(
                     username=self.host_cfg.get("username"),
-                    password=expandvars(self.host_cfg.get("password")),
+                    password=self.host_cfg.get("password"),
                 )
             )
 
         # add the default credentials
+        creds.append(self.app_cfg["defaults"]["credentials"])
 
-        creds.append(
-            dict(
-                username=self.app_cfg["defaults"]["username"],
-                password=self.app_cfg["defaults"]["password"],
-            )
-        )
+        # add any addition credentials defined in the os spec
+        if os_creds := self.os_spec.get("credentials"):
+            creds.extend(os_creds)
 
-        # add any additional credentials defined in the config-file
-
-        if "credentials" in self.app_cfg:
-            creds.extend(self.app_cfg["credentials"])
+        # add any additional global credentials
+        if gl_creds := self.app_cfg.get("credentials"):
+            creds.extend(gl_creds)
 
         return creds
 
@@ -247,6 +246,8 @@ class BasicSSHConnector(object):
         """
 
         creds = self._setup_creds()
+        if not creds[0]:
+            raise RuntimeError(f"{self.name}: No credentials")
 
         # TODO:
         #       if there are os_spec specific credentials then add those next
@@ -272,7 +273,7 @@ class BasicSSHConnector(object):
                     )
                     self.log.info(f"CONNECTED: {self.name}")
 
-                    if "disable_paging" in self.os_spec or self.disable_paging:
+                    if self.os_spec.get("disable_paging"):
                         self.process = await self.conn.create_process(term_type="vt100")
 
                     return self.conn
