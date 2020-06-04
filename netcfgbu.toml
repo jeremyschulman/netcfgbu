@@ -1,6 +1,9 @@
 [defaults]
 inventory = "$PROJ_DIR/inventory.csv"
+username = "jeremy.schulman"
+password = "$NETWORK_PASSWORD"
 configs_dir = "$PROJ_DIR/configs"
+
 
 [[inventory]]
     script = "$PROJ_DIR/netcfgbu/examples/netbox_inventory.py --output inventory.csv"
@@ -10,8 +13,8 @@ configs_dir = "$PROJ_DIR/configs"
 # -----------------------------------------------------------------------------
 
 [[credentials]]
-username = "jeremy.schulman"
-password = "$NETWORK_PASSWORD"
+username = "superadmin"
+password = "$ENABLE_PASSWORD"
 
 # -----------------------------------------------------------------------------
 #                       Network OS SPecifications
@@ -20,19 +23,19 @@ password = "$NETWORK_PASSWORD"
 #[os_specs.eos]
 #    disable_paging = "terminal length 0"
 
-[os_specs.ios]
+[os_name.ios]
     disable_paging = "terminal length 0"
 
-[os_specs.nxos]
+[os_name.nxos]
     show_running = 'show running-config | no-more'
 
-[os_specs.asa]
+[os_name.asa]
     disable_paging = 'terminal pager 0'
 
-[os_specs.aireos]
+[os_name.aireos]
     show_running = "show run-config commands"
     disable_paging = "config paging disable"
-    connection = "netcfgbu.os_specs.ssh.LoginPromoptUserPass"
+    connection = "netcfgbu.connectors.ssh.LoginPromoptUserPass"
 
 # -----------------------------------------------------------------------------
 # Logging - follows Python format as described
