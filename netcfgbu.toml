@@ -1,13 +1,30 @@
 [defaults]
-inventory = "$HOME/Projects/NetworkBackup/inventory.csv"
-configs_dir = "$HOME/Projects/NetworkBackup/configs"
+inventory = "$PROJ_DIR/inventory.csv"
+configs_dir = "$PROJ_DIR/configs"
+
+[[inventory]]
+    script = "$PROJ_DIR/netcfgbu/examples/netbox_inventory.py --output inventory.csv"
+
+# -----------------------------------------------------------------------------
+#                           Credentials
+# -----------------------------------------------------------------------------
 
 [[credentials]]
 username = "jeremy.schulman"
 password = "$NETWORK_PASSWORD"
 
-[os_specs.eos]
+# -----------------------------------------------------------------------------
+#                       Network OS SPecifications
+# -----------------------------------------------------------------------------
+
+#[os_specs.eos]
+#    disable_paging = "terminal length 0"
+
+[os_specs.ios]
     disable_paging = "terminal length 0"
+
+[os_specs.nxos]
+    show_running = 'show running-config | no-more'
 
 [os_specs.asa]
     disable_paging = 'terminal pager 0'
@@ -23,9 +40,13 @@ password = "$NETWORK_PASSWORD"
 # -----------------------------------------------------------------------------
 
 
-#[logging.loggers.netcfgbu2]
+[logging.loggers.netcfgbu]
+    handlers = ["console"]
+    level = "INFO"
+
+#[logging.loggers.asyncssh]
 #    handlers = ["console"]
-#    level = "INFO"
+#    level = "DEBUG"
 
 [logging.handlers.console]
     class = "logging.StreamHandler"
