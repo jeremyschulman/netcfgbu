@@ -85,6 +85,13 @@ Example:
 **Default credentials**<br/>
 As defined in the `[defaults]` section.
 
+Example:
+```toml
+[defaults]
+    credentials.username = 'nwkautomaniac'
+    credentials.password = "$NETWORK_PASSWORD"
+```
+
 **Global credentials**<br/>
 The `netcfgbu` tool will use these credentials in the order that they 
 are defined in the configuration file.
