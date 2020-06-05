@@ -17,12 +17,12 @@ Example for Cisco WLC:
 [os_name.aireos]
     show_running = "show run-config commands"
     disable_paging = "config paging disable"
-    connection = "netcfgbu.connectors.ssh.LoginPromoptUserPass"
+    connection = "netcfgbu.connectors.ssh.LoginPromptUserPass"
 ```
 
 The `connection` value identifies the python module location where this
 connector can be found. In the above example, you can find
-[LoginPromoptUserPass here](../netcfgbu/connectors/ssh.py). This approach
+[LoginPromptUserPass here](../netcfgbu/connectors/ssh.py). This approach
 allows you to use a connector that is either packaged with `netcfgbu` or use
 one that can be found in another python package should that be neccesary.
 

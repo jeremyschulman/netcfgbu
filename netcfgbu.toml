@@ -39,7 +39,7 @@
 [os_name.aireos]
     show_running = "show run-config commands"
     disable_paging = "config paging disable"
-    connection = "netcfgbu.connectors.ssh.LoginPromoptUserPass"
+    connection = "netcfgbu.connectors.ssh.LoginPromptUserPass"
 
 [os_name.panos]
     disable_paging = [
