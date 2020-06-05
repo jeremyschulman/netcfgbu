@@ -2,7 +2,8 @@
 
 The netcfgbu tool requires you to setup a TOML configuration file, by default
 is called `netcfgbu.toml` and is searched for in the current working directory.
-You can override this location using the -C <filepath> option.
+You can override this location using the -C <filepath> option or setting your
+environment variable `NETCFGBU_CONFIG`.
 
 (See [example config file](../netcfgbu.toml))
 
