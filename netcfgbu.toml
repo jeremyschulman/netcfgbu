@@ -21,9 +21,6 @@
 #                       Network OS SPecifications
 # -----------------------------------------------------------------------------
 
-#[os_specs.eos]
-#    disable_paging = "terminal length 0"
-
 [os_name.ios]
     disable_paging = "terminal length 0"
 #    [[os_name.ios.credentials]]
