@@ -15,7 +15,7 @@ required.
 
 * I want to provide my network inventory in a simple CSV format.  I want to
 create this inventory dynamically from one or more sources, for example Netbox.
-I want the ability to filter this inventory to include and exclude items based.
+I want the ability to filter this inventory with limit and exclude constraints.
 
 * I may need to try multiple SSH credendials.  I must not store my passwords in
 any configuration file, so this tool must acquire passwords via environment
