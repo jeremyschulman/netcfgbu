@@ -9,8 +9,9 @@ version control system, and I need a tool to automate this process.  My primary
 means of accessing the devices is SSH.
 
 **Primary Considerations**    
-* I will have multi-vendor environment. I need to account for the different commands
-that are used to obtain the running configuration and disable paging if required.
+* I have a multi-vendor environment. I need to account for the different commands
+that are used to obtain the running configuration and disable paging if
+required.
 
 * I want to provide my network inventory in a simple CSV format.  I want to
 create this inventory dynamically from one or more sources, for example Netbox.
