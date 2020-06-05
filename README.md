@@ -12,31 +12,31 @@ means of accessing the devices is SSH.
 * I will have multi-vendor environment. I need to account for the different commands
 that are used to obtain the running configuration and disable paging if required.
 
-* I want to provide my network inventory in a simple CSV format.  I want to pull
-content dynamically from one or more sources, for example Netbox.  I want the
-ability to filter this inventory to include and exclude items based.
+* I want to provide my network inventory in a simple CSV format.  I want to
+create this inventory dynamically from one or more sources, for example Netbox.
+I want the ability to filter this inventory to include and exclude items based.
 
-* I may need to try multiple SSH credendials.  I must not store my passwords in any configuration file,
-so this tool must acquire passwords via environment variables.
+* I may need to try multiple SSH credendials.  I must not store my passwords in
+any configuration file, so this tool must acquire passwords via environment
+variables.
 
 * I will have a large number of devices (>1000) so I want this tool to take
 advantage of any and all techniques that reduce the total amount of time.
 
 
 The general approach to `netcfgbu` is a configuration based methodology so as
-to not hardcoded the tool to work with specific network OS type device drivers,
-so that it avoids the complexity and dependency of including an array of
-3rd-party libraries specific to network devices.  See the
-[configuration](docs/configuration-file.md) for details.
+to not hardcode the tool to work with specific network device drivers
+and avoid the complexity and dependency of including a collection of 3rd-party
+libraries specific to network devices.  
 
-Document [starts here](docs/TOC.md).
-
+See [example netcfgbu.toml configuration](netcfgbu.toml).<br/>
+Read the document [here](docs/TOC.md).
 
 # Introduction
 
 Once you've setup the [configuration](docs/configuration-file.md) file and
-[inventory](docs/inventory.md) file you can backup all of our configurations using
-the command:
+[inventory](docs/inventory.md) file you can backup all of your configurations
+using the command:
 
 ```shell script
 $ netcfgbu backup
@@ -74,7 +74,8 @@ The `netcfgbu` tool requires you to setup a
 [TOML](https://github.com/toml-lang/toml)
 [configuration](docs/configuration-file.md) file, by default is called
 `netcfgbu.toml` and is searched for in the current working directory. You can
-override this location using the `-C <filepath>` option.
+override this location using the `-C <filepath>` option or using the
+environment variable `NETCFGBU_CONFIG`
 
 At a minimum you need to designate the [inventory](docs/inventory.md) file and
 a default set of SSH login credentials.  The network device configs will be
