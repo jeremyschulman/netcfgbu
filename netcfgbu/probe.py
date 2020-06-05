@@ -3,7 +3,7 @@ import asyncio
 __all__ = ["probe"]
 
 
-async def probe(host, port=22, timeout=10) -> bool:
+async def probe(host, port=22, timeout=10, raise_exc=False) -> bool:
     """
     Coroutine used to determine if a host port is online and available.
 
@@ -34,6 +34,7 @@ async def probe(host, port=22, timeout=10) -> bool:
         return True
 
     except asyncio.TimeoutError:
-        pass
+        if raise_exc:
+            raise
 
     return False

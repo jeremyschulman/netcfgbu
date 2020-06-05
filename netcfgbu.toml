@@ -1,11 +1,12 @@
 [defaults]
-inventory = "$PROJ_DIR/inventory.csv"
-configs_dir = "$PROJ_DIR/configs"
-credentials.username = "$NETWORK_USERNAME"
-credentials.password = "$NETWORK_PASSWORD"
+    inventory = "$PROJ_DIR/inventory.csv"
+    configs_dir = "$PROJ_DIR/configs"
+    credentials.username = "$NETWORK_USERNAME"
+    credentials.password = "$NETWORK_PASSWORD"
 
 
 [[inventory]]
+    name = 'netbox'
     script = "$PROJ_DIR/netcfgbu/examples/netbox_inventory.py --output inventory.csv"
 
 # -----------------------------------------------------------------------------
@@ -27,7 +28,7 @@ credentials.password = "$NETWORK_PASSWORD"
     disable_paging = "terminal length 0"
 #    [[os_name.ios.credentials]]
 #    username = 'bob'
-#    password = 'bob123'
+#    password = '$bob123'
 
 [os_name.nxos]
     show_running = 'show running-config | no-more'
@@ -54,7 +55,7 @@ credentials.password = "$NETWORK_PASSWORD"
 
 
 [logging.loggers.netcfgbu]
-    handlers = ["console"]
+    handlers = ["console", "file"]
     level = "INFO"
 
 #[logging.loggers.asyncssh]
@@ -65,6 +66,11 @@ credentials.password = "$NETWORK_PASSWORD"
     class = "logging.StreamHandler"
     formatter = "basic"
     stream = "ext://sys.stdout"
+
+[logging.handlers.file]
+    class = "logging.FileHandler"
+    formatter = "basic"
+    filename =  "netcfgbu.log"
 
 [logging.formatters.basic]
     format = "%(asctime)s %(levelname)s - %(message)s"

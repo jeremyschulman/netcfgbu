@@ -1,7 +1,6 @@
 from typing import Optional
 import asyncio
 import io
-from os.path import expandvars
 from pathlib import Path
 import re
 from copy import copy
@@ -138,8 +137,9 @@ class BasicSSHConnector(object):
     #
     # -------------------------------------------------------------------------
 
-    async def test_login(self) -> Optional[str]:
+    async def test_login(self, timeout=None) -> Optional[str]:
         login_as = None
+        self.os_spec["timeout"] = timeout
 
         try:
             async with await self.login():
@@ -182,7 +182,7 @@ class BasicSSHConnector(object):
 
         except asyncio.TimeoutError:
             raise asyncio.TimeoutError(
-                f"Timeout when getting running configuraiton",
+                "Timeout when getting running configuraiton",
                 dict(at_prompt=at_prompt, paging_disabled=paging_disabled),
             )
 
@@ -249,8 +249,7 @@ class BasicSSHConnector(object):
         if not creds[0]:
             raise RuntimeError(f"{self.name}: No credentials")
 
-        # TODO:
-        #       if there are os_spec specific credentials then add those next
+        timeout = self.os_spec.get("timeout") or consts.DEFAULT_LOGIN_TIMEOUT
 
         # interate through all of the credential options until one is accepted.
         # the number of max setup connections is controlled by a semaphore
@@ -269,7 +268,7 @@ class BasicSSHConnector(object):
 
                     self.log.info(login_msg)
                     self.conn = await asyncio.wait_for(
-                        asyncssh.connect(**self.conn_args), timeout=60
+                        asyncssh.connect(**self.conn_args), timeout
                     )
                     self.log.info(f"CONNECTED: {self.name}")
 

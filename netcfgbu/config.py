@@ -1,10 +1,11 @@
-import sys
 from os.path import expandvars
 from pathlib import Path
 import toml
 from itertools import chain
 
 from .logger import setup_logging, get_logger
+
+__all__ = ["load"]
 
 
 def load(*, filepath=None, fileio=None):
@@ -60,10 +61,9 @@ def load_creds(app_cfg):
         for key, value in cred.items():
             new_value = cred[key] = expandvars(value)
             if new_value.startswith("$") and new_value == value:
-                msg = f'credential {cred["username"]} using undefined variable "{value}", aborting.'
-                sys.exit(msg)
-                # cred.clear()
-                # break
+                msg = f'credential "{cred["username"]}" using undefined variable "{value}", aborting.'
+                log.error(msg)
+                raise RuntimeError(msg)
 
     # now remove any credentials that did not expand correctly.
 

@@ -11,6 +11,9 @@ from collections import defaultdict, Counter
 from errno import errorcode
 from operator import itemgetter
 from textwrap import indent
+import csv
+from time import monotonic
+from datetime import datetime
 
 # -----------------------------------------------------------------------------
 # Public Imports
@@ -18,6 +21,7 @@ from textwrap import indent
 
 import click
 from tabulate import tabulate
+from first import first
 
 # -----------------------------------------------------------------------------
 # Private Imports
@@ -34,7 +38,6 @@ from netcfgbu.aiofut import as_completed
 import netcfgbu.inventory
 
 VERSION = metadata.version(netcfgbu.__package__)
-
 
 LN_SEP = "# " + "-" * 78
 SPACES_4 = " " * 4
@@ -61,45 +64,81 @@ SPACES_4 = " " * 4
 
 
 def err_reason(exc):
-    if isinstance(exc, OSError):
-        return errorcode[exc.errno]
-    elif isinstance(exc, asyncio.TimeoutError):
-        return "TIMEOUT%s" % (str(exc.args or ""))
-    else:
-        return "%s: %s" % (str(exc.__class__.__name__), str(exc))
+    return {
+        str: lambda: exc,
+        asyncio.TimeoutError: lambda: "TIMEOUT%s" % (str(exc.args or "")),
+        OSError: lambda: errorcode[exc.errno],
+    }.get(exc.__class__, lambda: "%s: %s" % (str(exc.__class__.__name__), str(exc)))()
 
 
-def print_report(report, total_n):
+class Report(object):
+    TIME_FORMAT = "%Y-%b-%d %I:%M:%S %p"
 
-    fail_n = len(report["fail"])
-    ok_n = len(report["ok"])
-    err_n = len(report["error"])
+    def __init__(self):
+        self.start_ts = None
+        self.start_tm = 0
 
-    print(LN_SEP)
-    print(f"Summary: TOTAL={total_n}, OK={ok_n}, FAIL={fail_n}, ERROR={err_n}")
+        self.stop_ts = None
+        self.stop_tm = 0
 
-    if fail_n:
-        print(f"\n\nFAIL: ({fail_n})")
+        self.task_results = defaultdict(list)
+
+    def start_timing(self):
+        self.start_ts = datetime.now()
+        self.start_tm = monotonic()
+
+    def stop_timing(self):
+        self.stop_ts = datetime.now()
+        self.stop_tm = monotonic()
+
+    @property
+    def start_time(self):
+        return self.start_ts.strftime(self.TIME_FORMAT)
+
+    @property
+    def stop_time(self):
+        return self.stop_ts.strftime(self.TIME_FORMAT)
+
+    @property
+    def duration(self):
+        return self.stop_tm - self.start_tm
+
+    def print_report(self):
+        if not self.stop_tm:
+            self.stop_timing()
+
+        fail_n = len(self.task_results[False])
+        ok_n = len(self.task_results[True])
+
+        total_n = ok_n + fail_n
+
+        print(LN_SEP)
+
         print(
-            tabulate(
-                headers=["host", "os_name"],
-                tabular_data=[[rec["host"], rec["os_name"]] for rec in report["FAIL"]],
-            )
+            f"Summary: TOTAL={total_n}, OK={ok_n}, FAIL={fail_n}\n"
+            f"         START={self.start_time}, STOP={self.stop_time}\n"
+            f"         DURATION={self.duration:.3f}s"
         )
 
-    if err_n:
-        print(f"\n\nERRORS: ({err_n})")
-        print(
-            tabulate(
-                headers=["host", "os_name", "reason"],
-                tabular_data=[
-                    [rec["host"], rec["os_name"], err_reason(exc)]
-                    for rec, exc in report["error"]
-                ],
-            )
-        )
+        headers = ["host", "os_name", "reason"]
 
-    print(LN_SEP)
+        failure_tabular_data = [
+            [rec["host"], rec["os_name"], err_reason(exc)]
+            for rec, exc in self.task_results[False]
+        ]
+
+        if not fail_n:
+            print(LN_SEP)
+            return
+
+        with open("failures.csv", "w+") as ofile:
+            wr_csv = csv.writer(ofile)
+            wr_csv.writerow(headers)
+            wr_csv.writerows(failure_tabular_data)
+
+        print(f"\n\nFAILURES: {fail_n}")
+        print(tabulate(headers=headers, tabular_data=failure_tabular_data))
+        print(LN_SEP)
 
 
 # -----------------------------------------------------------------------------
@@ -109,8 +148,7 @@ def print_report(report, total_n):
 # -----------------------------------------------------------------------------
 
 
-def exec_backup(app_cfg, inventory_recs, cli_opts):
-
+def exec_backup(app_cfg, inventory_recs):
     backup_tasks = dict()
 
     log = get_logger()
@@ -120,7 +158,7 @@ def exec_backup(app_cfg, inventory_recs, cli_opts):
     }
 
     total = len(backup_tasks)
-    report = defaultdict(list)
+    report = Report()
     done = 0
 
     async def process_batch():
@@ -133,21 +171,21 @@ def exec_backup(app_cfg, inventory_recs, cli_opts):
 
             try:
                 res = task.result()
-                if res is not True:
-                    log.info(": ERROR: %s" % err_reason(res))
-                    report["fail"].append(rec)
-                else:
-                    log.info(msg + ": OK")
-                    report["ok"].append(rec)
+                ok = res is True
+                report.task_results[ok].append((rec, res))
 
             except Exception as exc:
-                report["error"].append((rec, exc))
-                log.error(msg + f": {str(exc)}")
+                ok = False
+                report.task_results[False].append((rec, exc))
+
+            log.info(msg + "PASS" if ok else "FALSE")
 
     loop = asyncio.get_event_loop()
+    report.start_timing()
     loop.run_until_complete(process_batch())
+    report.stop_timing()
     stop_aiologging()
-    print_report(report, len(inventory_recs))
+    report.print_report()
 
 
 # -----------------------------------------------------------------------------
@@ -158,9 +196,9 @@ def exec_backup(app_cfg, inventory_recs, cli_opts):
 
 
 def exec_test_login(app_cfg, inventory_recs, cli_opts):
-
     login_tasks = {
-        make_host_os_spec(rec, app_cfg).test_login(): rec for rec in inventory_recs
+        make_host_os_spec(rec, app_cfg).test_login(timeout=cli_opts["timeout"]): rec
+        for rec in inventory_recs
     }
 
     if (batch_n := cli_opts["batch"]) is not None:
@@ -168,7 +206,7 @@ def exec_test_login(app_cfg, inventory_recs, cli_opts):
 
     total = len(login_tasks)
 
-    report = defaultdict(list)
+    report = Report()
     done = 0
     log = get_logger()
 
@@ -183,23 +221,26 @@ def exec_test_login(app_cfg, inventory_recs, cli_opts):
             try:
                 if login_user := task.result():
                     log.info(msg + f"with user {login_user}")
-                    report["ok"].append(rec)
+                    report.task_results[True].append(rec)
                 else:
-                    log.warning(msg + "NO LOGIN")
-                    report["fail"].append(rec)
+                    reason = "all credentials failed"
+                    log.warning(msg + reason)
+                    report.task_results[False].append((rec, reason))
+
+            except asyncio.TimeoutError as exc:
+                log.warning(msg + "Timeout")
+                report.task_results[False].append((rec, exc))
 
             except Exception as exc:
-                if isinstance(exc, asyncio.TimeoutError):
-                    log.warning(msg + "Timeout")
-                    report["fail"].append(rec)
-                else:
-                    report["error"].append((rec, exc))
-                    log.error(msg + f": {err_reason(exc)}")
+                report.task_results[False].append((rec, exc))
+                log.error(msg + f": {err_reason(exc)}")
 
     loop = asyncio.get_event_loop()
+    report.start_timing()
     loop.run_until_complete(process_batch())
+    report.stop_timing()
     stop_aiologging()
-    print_report(report, len(login_tasks))
+    report.print_report()
 
 
 # -----------------------------------------------------------------------------
@@ -209,33 +250,43 @@ def exec_test_login(app_cfg, inventory_recs, cli_opts):
 # -----------------------------------------------------------------------------
 
 
-def exec_probe(inventory):
+def exec_probe(inventory, timeout=None):
     inv_n = len(inventory)
     log = get_logger()
     log.info(f"Checking SSH reachability on {inv_n} devices ...")
 
     tasks = dict()
     loop = asyncio.get_event_loop()
-    tasks = {probe(rec.get("ipaddr") or rec.get("host")): rec for rec in inventory}
-    report = defaultdict(list)
+
+    tasks = {
+        probe(
+            rec.get("ipaddr") or rec.get("host"), timeout=timeout, raise_exc=True
+        ): rec
+        for rec in inventory
+    }
+
+    report = Report()
 
     async def proces_check():
         async for probe_task in as_completed(tasks):
+            task_coro = probe_task.get_coro()
+            rec = tasks[task_coro]
+
             try:
-                task_coro = probe_task.get_coro()
-                rec = tasks[task_coro]
-                probe_ok = "ok" if probe_task.result() else "fail"
-                report[probe_ok].append(rec)
+                probe_ok = probe_task.result()
+                report.task_results[probe_ok].append((rec, probe_ok))
 
-            except OSError as exc:
-                probe_ok = "error"
-                report["error"].append((rec, exc))
+            except (asyncio.TimeoutError, OSError) as exc:
+                probe_ok = False
+                report.task_results[False].append((rec, exc))
 
-            log.info(f"{rec['host']}: {probe_ok}")
+            log.info(f"{rec['host']}: {'PASS' if probe_ok else 'FAIL'}")
 
+    report.start_timing()
     loop.run_until_complete(proces_check())
+    report.stop_timing()
     stop_aiologging()
-    print_report(report, len(tasks))
+    report.print_report()
 
 
 # -----------------------------------------------------------------------------
@@ -260,18 +311,18 @@ class WithInventoryCommand(click.Command):
     def invoke(self, ctx):
 
         try:
-            app_cfg = ctx.obj["app_cfg"] = config.load(
-                fileio=ctx.params["config"]
-            )
+            app_cfg = ctx.obj["app_cfg"] = config.load(fileio=ctx.params["config"])
             ctx.obj["inventory_recs"] = netcfgbu.inventory.load(
-                app_cfg=app_cfg, limits=ctx.params["limit"]
+                app_cfg=app_cfg,
+                limits=ctx.params["limit"],
+                excludes=ctx.params["exclude"],
             )
 
         except FileNotFoundError as exc:
             sys.exit(f"File not found: {exc.filename}")
 
         except Exception as exc:
-            ctx.fail(f"ERROR: {exc.args[0]}")
+            ctx.fail(f"{exc.args[0]}")
 
         if not ctx.obj["inventory_recs"]:
             sys.exit("No inventory matching limits.")
@@ -280,16 +331,31 @@ class WithInventoryCommand(click.Command):
 
 
 opt_config_file = click.option(
-    "-C", "--config", envvar="NETCFGBU_CONFIG", type=click.File(), required=True
+    "-C",
+    "--config",
+    envvar="NETCFGBU_CONFIG",
+    type=click.File(),
+    required=True,
+    default="netcfgbu.toml",
 )
 
-opt_limits = click.option("--limit", "-l", multiple=True, help="limit inventory",)
+opt_limits = click.option(
+    "--limit", "-l", "--include", multiple=True, help="limit inventory",
+)
+
+opt_excludes = click.option(
+    "--exclude", "-e", multiple=True, help="exclude from inventory",
+)
 
 opt_batch = click.option(
     "--batch",
     "-b",
     type=click.IntRange(1, 500),
     help="inevntory record processing batch size",
+)
+
+opt_timeout = click.option(
+    "--timeout", "-t", help="timeout(s)", type=click.IntRange(0, 5 * 60)
 )
 
 
@@ -302,17 +368,14 @@ def cli():
 @cli.command(name="backup", cls=WithInventoryCommand)
 @opt_config_file
 @opt_limits
+@opt_excludes
 @opt_batch
 @click.pass_context
-def cli_backup(ctx, **cli_opts):
+def cli_backup(ctx, **_cli_opts):
     """
     Backup network configurations.
     """
-    exec_backup(
-        app_cfg=ctx.obj["app_cfg"],
-        inventory_recs=ctx.obj["inventory_recs"],
-        cli_opts=cli_opts,
-    )
+    exec_backup(app_cfg=ctx.obj["app_cfg"], inventory_recs=ctx.obj["inventory_recs"])
 
 
 # -----------------------------------------------------------------------------
@@ -323,6 +386,8 @@ def cli_backup(ctx, **cli_opts):
 @cli.command(name="probe", cls=WithInventoryCommand)
 @opt_config_file
 @opt_limits
+@opt_excludes
+@opt_timeout
 @click.pass_context
 def cli_check(ctx, **cli_opts):
     """
@@ -331,7 +396,7 @@ def cli_check(ctx, **cli_opts):
     The probe check determines if the device is reachable and the SSH port
     is available to receive connections.
     """
-    exec_probe(ctx.obj["inventory_recs"])
+    exec_probe(ctx.obj["inventory_recs"], timeout=cli_opts["timeout"])
 
 
 # -----------------------------------------------------------------------------
@@ -342,6 +407,8 @@ def cli_check(ctx, **cli_opts):
 @cli.command(name="login", cls=WithInventoryCommand)
 @opt_config_file
 @opt_limits
+@opt_excludes
+@opt_timeout
 @opt_batch
 @click.pass_context
 def cli_login(ctx, **cli_opts):
@@ -368,10 +435,10 @@ def cli_inventory():
 @cli_inventory.command("ls", cls=WithInventoryCommand)
 @opt_config_file
 @opt_limits
-@click.option("--brief", '-b', is_flag=True)
+@opt_excludes
+@click.option("--brief", "-b", is_flag=True)
 @click.pass_context
 def cli_inventory_list(ctx, **cli_opts):
-
     inventory_recs = ctx.obj["inventory_recs"]
     os_names = Counter(rec["os_name"] for rec in inventory_recs)
 
@@ -403,11 +470,12 @@ SUMMARY: TOTAL={len(inventory_recs)}
     )
 
 
-@cli_inventory.command("build")
+@cli_inventory.command("build", cls=WithConfigCommand)
 @opt_config_file
 @click.option("--name", "-n", help="inventory name")
 @click.option("--brief", is_flag=True)
-def cli_inventory_build(**cli_opts):
+@click.pass_context
+def cli_inventory_build(ctx, **cli_opts):
     """
     Build the inventory file.
 
@@ -415,12 +483,17 @@ def cli_inventory_build(**cli_opts):
     can use this command to the script to build the inventory.
     """
     from netcfgbu.cli.inventory import build
+    inv_secs = ctx.obj['app_cfg'].get('inventory')
+    if not inv_secs:
+        sys.exit("No inventory sections defined in configuration.")
 
-    app_cfg = config.load(fileio=cli_opts["config"])
-    try:
-        inv_df = app_cfg["inventory"][0]
-    except IndexError:
-        sys.exit("No inventory defined in configuration file")
+    if inv_name := cli_opts['name']:
+        inv_df = first(inv for inv in inv_secs if inv.get('name', '') == inv_name)
+    else:
+        inv_df = ctx.obj["app_cfg"]["inventory"][0]
+
+    if not inv_df:
+        sys.exit("Inventory not defined in configuration file")
 
     build(inv_df)
 

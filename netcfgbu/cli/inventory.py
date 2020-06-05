@@ -13,4 +13,10 @@ def build(inv_def):
 
     script = expandvars(script)
     lgr.info(f"Executing script: [{script}]")
+
+    # Note: if you want to check the pass/fail of this call os.system() will
+    # return 0 or non-zero as the exit code from the underlying script.  There
+    # is no exception handling.  If you want to do exception handling, then
+    # you'll need to use subprocess.call in place of os.system.
+
     os.system(script)

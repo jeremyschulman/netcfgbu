@@ -17,7 +17,7 @@ import logging
 import logging.handlers
 
 
-__all__ = ["get_logger", "stop_aiologging"]
+__all__ = ["setup_logging", "get_logger", "stop_aiologging"]
 
 
 _g_quelgr_listener: logging.handlers.QueueListener
