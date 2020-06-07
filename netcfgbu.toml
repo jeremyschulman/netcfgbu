@@ -7,28 +7,40 @@
 
 [[inventory]]
     name = 'netbox'
-    script = "$PROJ_DIR/netcfgbu/examples/netbox_inventory.py --output inventory.csv"
+    script = """\
+$PROJ_DIR/netcfgbu/examples/netbox_inventory.py \
+    --exclude-tag no-backup \
+    --output inventory.csv
+    """
 
 # -----------------------------------------------------------------------------
 #                           Credentials
 # -----------------------------------------------------------------------------
 
 #[[credentials]]
-#username = "superadmin"
-#password = "$ENABLE_PASSWORD"
+#   username = "superadmin"
+#   password = "$ENABLE_PASSWORD"
 
 # -----------------------------------------------------------------------------
-#                       Network OS SPecifications
+#                       Network OS Specifications
 # -----------------------------------------------------------------------------
 
 [os_name.ios]
     disable_paging = "terminal length 0"
+    linter = "ios"
 #    [[os_name.ios.credentials]]
-#    username = 'bob'
-#    password = '$bob123'
+#       username = 'bob'
+#       password = '$bob123'
+
+[os_name.iosxe]
+    linter = 'ios'
 
 [os_name.nxos]
     show_running = 'show running-config | no-more'
+    linter = "nxos"
+
+[os_name.iosxr]
+    linter = "iosxr"
 
 [os_name.asa]
     disable_paging = 'terminal pager 0'
@@ -44,6 +56,23 @@
         "configure"
     ]
     show_running = "show"
+    linter = "panos"
+
+# -----------------------------------------------------------------------------
+#                                 Linters
+# -----------------------------------------------------------------------------
+
+[linters.iosxr]
+    config_starts_after = 'Building configuration'
+
+[linters.ios]
+    config_starts_after = 'Current configuration'
+
+[linters.nxos]
+    config_starts_after = '!Time:'
+
+[linters.panos]
+    config_ends_at = "[edit]"
 
 # -----------------------------------------------------------------------------
 # Logging - follows Python format as described
@@ -70,4 +99,4 @@
     filename =  "netcfgbu.log"
 
 [logging.formatters.basic]
-    format = "%(asctime)s %(levelname)s - %(message)s"
+    format = "%(asctime)s %(levelname)s: %(message)s"

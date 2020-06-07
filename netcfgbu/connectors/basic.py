@@ -11,7 +11,7 @@ import asyncssh
 
 from netcfgbu.logger import get_logger
 from netcfgbu import consts
-
+from netcfgbu import linter
 
 __all__ = ["BasicSSHConnector", "set_max_startups"]
 
@@ -335,11 +335,21 @@ class BasicSSHConnector(object):
     # -------------------------------------------------------------------------
 
     async def save_config(self):
+        config_content = self.config.replace("\r", "")
+
+        if linter_name := self.os_spec.get("linter"):
+            lint_spec = self.app_cfg["linters"][linter_name]
+            orig = config_content
+            config_content = linter.lint_content(config_content, lint_spec)
+            if orig == config_content:
+                self.log.debug(f"LINT no change on {self.name}")
+
         self.save_file = (
             Path(self.app_cfg["defaults"]["configs_dir"]) / f"{self.name}.cfg"
         )
+
         async with aiofiles.open(self.save_file, mode="w+") as ofile:
-            await ofile.write(self.config.replace("\r", ""))
+            await ofile.write(config_content)
             await ofile.write("\n")
 
 
