@@ -64,14 +64,6 @@ def setup_logging_queue(logger_names) -> None:
 
 def setup_logging(app_cfg):
     log_cfg = app_cfg.get("logging") or {}
-
-    # std_lgr = get_stdout_logger()
-    # std_lgr.addHandler(logging.StreamHandler())
-    # std_lgr.handlers[0].setFormatter(logging.Formatter(fmt="%(message)s"))
-    # std_lgr.setLevel(logging.INFO)
-    #
-    # log_cfg['loggers'][STDOUT_LGR] ={}
-
     log_cfg["version"] = 1
     dictConfig(log_cfg)
     setup_logging_queue(log_cfg["loggers"])

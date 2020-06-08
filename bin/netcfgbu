@@ -4,6 +4,7 @@
 # System Imports
 # -----------------------------------------------------------------------------
 
+from typing import List
 import sys
 from pathlib import Path
 import asyncio
@@ -165,6 +166,10 @@ def exec_backup(app_cfg, inventory_recs):
     done = 0
 
     async def process_batch():
+
+        # from asyncssh import logging as assh_lgr
+        # assh_lgr.set_debug_level(3)
+
         nonlocal done
         async for task in as_completed(backup_tasks):
             done += 1
@@ -178,6 +183,9 @@ def exec_backup(app_cfg, inventory_recs):
                 report.task_results[ok].append((rec, res))
 
             except Exception as exc:
+                import traceback
+
+                traceback.print_exc()
                 ok = False
                 report.task_results[False].append((rec, exc))
 
@@ -215,6 +223,9 @@ def exec_test_login(app_cfg, inventory_recs, cli_opts):
 
     async def process_batch():
         nonlocal done
+
+        # from asyncssh import logging as assh_lgr
+        # assh_lgr.set_debug_level(3)
 
         async for task in as_completed(login_tasks):
             done += 1
@@ -365,6 +376,10 @@ class WithInventoryCommand(click.Command):
 
         try:
             app_cfg = ctx.obj["app_cfg"] = config.load(fileio=ctx.params["config"])
+
+            if ctx.params["inventory"]:
+                ctx.obj["app_cfg"].defaults.inventory = ctx.params["inventory"]
+
             ctx.obj["inventory_recs"] = netcfgbu.inventory.load(
                 app_cfg=app_cfg,
                 limits=ctx.params["limit"],
@@ -374,7 +389,7 @@ class WithInventoryCommand(click.Command):
         except FileNotFoundError as exc:
             sys.exit(f"File not found: {exc.filename}")
 
-        except Exception as exc:
+        except RuntimeError as exc:
             ctx.fail(f"{exc.args[0]}")
 
         if not ctx.obj["inventory_recs"]:
@@ -392,6 +407,9 @@ opt_config_file = click.option(
     default="netcfgbu.toml",
 )
 
+opt_inventory = click.option(
+    "--inventory", "-i", help="Inventory file-name", envvar="NETCFGBU_INVENTORY"
+)
 
 opt_limits = click.option(
     "--limit", "-l", "--include", multiple=True, help="limit/include in inventory",
@@ -403,7 +421,9 @@ opt_excludes = click.option(
 
 
 def opts_inventory(in_fn_deco):
-    return reduce(lambda _d, fn: fn(_d), [opt_limits, opt_excludes], in_fn_deco)
+    return reduce(
+        lambda _d, fn: fn(_d), [opt_inventory, opt_limits, opt_excludes], in_fn_deco
+    )
 
 
 opt_batch = click.option(
@@ -537,16 +557,17 @@ def cli_inventory_build(ctx, **cli_opts):
     If the netcfgbu configuraiton file contains inventory definitions then you
     can use this command to the script to build the inventory.
     """
-    from netcfgbu.cli.inventory import build
+    from netcfgbu.inventory import build
 
-    inv_secs = ctx.obj["app_cfg"].get("inventory")
+    inv_secs: List[config.InventorySpec] = ctx.obj["app_cfg"].inventory
+
     if not inv_secs:
         sys.exit("No inventory sections defined in configuration.")
 
     if inv_name := cli_opts["name"]:
-        inv_df = first(inv for inv in inv_secs if inv.get("name", "") == inv_name)
+        inv_df = first(inv for inv in inv_secs if getattr(inv, "name", "") == inv_name)
     else:
-        inv_df = ctx.obj["app_cfg"]["inventory"][0]
+        inv_df = inv_secs[0]
 
     if not inv_df:
         sys.exit("Inventory not defined in configuration file")
@@ -563,7 +584,7 @@ def cli_inventory_build(ctx, **cli_opts):
 @opt_config_file
 @opts_inventory
 @click.pass_context
-def cli_lint(ctx, **cli_opts):
+def cli_lint(ctx, **_cli_opts):
     """
     Remove unwanted content from network config files.
     """

@@ -10,8 +10,7 @@
     script = """\
 $PROJ_DIR/netcfgbu/examples/netbox_inventory.py \
     --exclude-tag no-backup \
-    --output inventory.csv
-    """
+    --output inventory.csv"""
 
 # -----------------------------------------------------------------------------
 #                           Credentials
@@ -25,12 +24,13 @@ $PROJ_DIR/netcfgbu/examples/netbox_inventory.py \
 #                       Network OS Specifications
 # -----------------------------------------------------------------------------
 
+# -----------------------------------------------------------------------------
+# Cisco switchs, routers, and firewalls
+# -----------------------------------------------------------------------------
+
 [os_name.ios]
     disable_paging = "terminal length 0"
     linter = "ios"
-#    [[os_name.ios.credentials]]
-#       username = 'bob'
-#       password = '$bob123'
 
 [os_name.iosxe]
     linter = 'ios'
@@ -45,10 +45,42 @@ $PROJ_DIR/netcfgbu/examples/netbox_inventory.py \
 [os_name.asa]
     disable_paging = 'terminal pager 0'
 
+# -----------------------------------------------------------------------------
+# Cisco WLC
+# -----------------------------------------------------------------------------
+
 [os_name.aireos]
+    # support for 8.5 release requires a special connector to handle the User &
+    # Password prompts
+
     show_running = "show run-config commands"
     disable_paging = "config paging disable"
     connection = "netcfgbu.connectors.ssh.LoginPromptUserPass"
+
+[os_name.aireos8_10]
+    # extending the timeout to 3min due to observations with the 8.10 release
+    # resulting in sporatic delays in the output of the config.
+
+    timeout = 300
+
+    show_running = "show run-config commands"
+    disable_paging = "config paging disable"
+
+    # need to explicitly set the Key Exchange algorithms to support the 8.10
+    # SSH configured requirements.
+
+    ssh_configs.kex_algs = [
+        'ecdh-sha2-nistp256',
+        'diffie-hellman-group14-sha1'
+    ]
+
+    [[os_name.aireos8_10.credentials]]
+        username = "$WLC_USERNAME"
+        password = "$WLC_PASSWORD"
+
+# -----------------------------------------------------------------------------
+# Palo Alto PANOS Firewalls
+# -----------------------------------------------------------------------------
 
 [os_name.panos]
     disable_paging = [
