@@ -71,6 +71,14 @@ class Defaults(NoExtraBaseModel, BaseSettings):
     credentials: DefaultCredential
 
 
+class GithubSpec(NoExtraBaseModel):
+    github: Optional[str]
+    repo: str
+    username: Optional[EnvExpand]
+    password: Optional[EnvExpand]
+    token: Optional[EnvSecretStr]
+
+
 class OSNameSpec(NoExtraBaseModel):
     credentials: Optional[List[Credential]]
     pre_get_config: Optional[Union[str, List[str]]]
@@ -110,3 +118,4 @@ class AppConfig(NoExtraBaseModel):
     linters: Optional[Dict[str, LinterSpec]]
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
+    vcs: Dict[str, GithubSpec]
