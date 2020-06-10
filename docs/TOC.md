@@ -1,5 +1,7 @@
 # netcfgbu Documentation
 
+* [Quick Start](QuickStart.md)
+
 * [Configuration](configuration-file.md)
   
 * [Inventory](inventory.md)
