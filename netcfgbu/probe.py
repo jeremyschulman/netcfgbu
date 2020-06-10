@@ -19,11 +19,10 @@ async def probe(host, port=22, timeout=10, raise_exc=False) -> bool:
         The connect timeout in seconds.  If the probe done doen connect
         within this timeout then the probe returns False
 
-    Returns
-    -------
-    bool:
-        True when the host/port is online,
-        False when the host/port is offline
+    raise_exc: bool
+        When the probe fails:
+            When True the asyncio.TimeoutError will be raised
+            When False, return False
     """
 
     loop = asyncio.get_running_loop()

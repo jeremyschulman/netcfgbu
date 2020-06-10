@@ -14,7 +14,7 @@ from invoke import task
 PYTHON_PATHS = [
     'netcfgbu/',
     'bin/netcfgbu',
-    'examples/*.py'
+    'netbox/*.py'
 ]
 
 

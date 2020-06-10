@@ -23,8 +23,9 @@ code changes to `netcfgbu`.
 
 ## Defaults
 
-The configuration requires at a mininum the following items, all of which support the use
-of environment variables.
+All of the default values support the use of environment variables as shown
+in the example below.  All of these defaults also support the use
+of `NETCFGBU_` enviornment variables as described [here](environment_variables.md).
 
 **`inventory`**<br/>
 File path to the inventory CSV. 
@@ -44,8 +45,16 @@ Example:
     credentials.password = "$NETWORK_PASSWORD"
 ```
 
-## Credentials
+## Changing Storage Directory
+To change where the configuration files are stored you add the `config_dir`
+variable to the defaults section, for example:
 
+```toml
+[defaults]
+configs_dir = "$PROJ_DIR/configs"
+```
+
+## Credentials
 The `netcfgbu` tool will attempt to login to each device using any of the
 following credentials **_in this order_**:
 
@@ -114,21 +123,30 @@ Most devices will require you to disable paging before getting the running
 config.  To account for this, you need to define OS specification sections. For
 each `[os_name.$name]` section you can configure the following variables:
 
-**`disable_paging`**:<br/>
+**`pre_get_config`**:<br/>
 The command(s) required to disable paging so that when running the command(s) to
 obtain the running config the SSH session is not blocked awaiting on a _More_ prompt.
 
 **`get_config`**:<br/>
 The command(s) required to obtain the running configuration.
 
-Generally each of these variables is a single command, for example:
+***`timeout`***<br/>
+The time in seconds to await the collection of the configuration before
+declaring a timeout error.  Default is 60 seconds.
 
+***`linter`***<br/>
+Identifies the Linter specification to apply to the configuration once it
+has been retrieved.  See [Linters](#Linters) in next section.
+
+Examples:
 ```toml
 [os_name.ios]
-   disable_paging = "terminal length 0"
+   pre_get_config = "terminal length 0"
+   linter = "ios"
 
 [os_name.asa]
-    disable_paging = 'terminal pager 0'
+    timeout = 120
+    pre_get_config = 'terminal pager 0'
 
 [os_name.nxos]
     get_config = 'show running-config | no-more'
@@ -137,16 +155,22 @@ Generally each of these variables is a single command, for example:
 If you need to provide multiple commands, define a list of commands, as described
 [TOML Array](https://github.com/toml-lang/toml#user-content-array).
 
+## Linters
+Linters post-process the configuration once it has been retrieved from the device.
+At present there are two variables you can define:
 
-## Changing Storage Directory
-To change where the configuration files are stored you add the `config_dir`
-variable to the defaults section, for example:
+**config_starts_after**<br/>
+A regular-expression or value that designates the line before
+the configuration file contents.  Different operating systems have a
+different "starting line", for example:
 
 ```toml
-[defaults]
-config_dir = "$PROJ_DIR/configs"
-```
+[linters.iosxr]
+    config_starts_after = 'Building configuration'
 
+[linters.ios]
+    config_starts_after = 'Current configuration'
+```
 
 ## Inventory Scripts
 You can use `netcfgbu` to invoke a script that is used to extract inventory from
@@ -185,6 +209,39 @@ $ netcfgbu inventory build --name netbox
 If you do not provide a name `netcfgbu` will use the first configured inventory
 section by default.
 
+## SSH Config Options
+You may need to provide SSH configuration options such as Key Exchange or
+Cipher options.  The `netcfgbu` tool uses [AsyncSSH](https://github.com/ronf/asyncssh) as an underlying transport.
+You can provide any SSH Configuration option supported by AsyncSSH either at 
+the global level or at the OS-spec level.
+
+For example at the global level:
+```toml
+[ssh_configs]
+   kex_algs = ["ecdh-sha2-nistp256", "diffie-hellman-group14-sha1"]
+   encryption_algs = [
+      "aes128-cbc,3des-cbc",
+      "aes192-cbc,aes256-cbc",
+      "aes256-ctr,aes192-ctr",
+      "aes128-ctr"]
+```
+
+Or at an OS-spec level:
+```toml
+[os_name.aireos]
+   ssh_configs.kex_algs =  ["ecdh-sha2-nistp256", "diffie-hellman-group14-sha1"]
+   ssh_configs.encryption_algs = ["aes128-cbc,3des-cbc"]
+```
+
+If both global and OS-spec SSH configuration options are provided the OS-spec
+option will be used; i.e. overrides the specific option if it was present
+in the global options.
+
+For details on the specific SSH options, refer to the AsyncSSH option names, [here](https://asyncssh.readthedocs.io/en/stable/api.html#asyncssh.SSHClientConnectionOptions)
+and supported option values, [here](https://asyncssh.readthedocs.io/en/stable/api.html#supported-algorithms).
+
+*NOTE: A future version of AsyncSSH will support the use of ssh_config file(s)*
+
 ## Custom Connections
 In some cases an OS may require a non-standard process to login to the device
 above and beyond the standard SSH connection authentication process.  In such
@@ -199,15 +256,14 @@ authentication.  The OS specific configuration for WLC would be:
 Example:
 ```toml
 [os_name.aireos]
-    show_running = "show run-config commands"
-    disable_paging = "config paging disable"
+    get_config = "show run-config commands"
+    pre_get_config = "config paging disable"
     connection = "netcfgbu.connectors.ssh.LoginPromptUserPass"
 ```
 
 For more details see [custom connector](custom-connectors.md).
 
 ## Logging
-
 To enable logging you can defined the `[logging]` section in the configuration
 file. The format of this section is the standard Python logging module, as
 documented [here]( https://docs.python.org/3/library/logging.config.html).

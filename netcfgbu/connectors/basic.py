@@ -25,11 +25,11 @@ class BasicSSHConnector(object):
     specification, and the application configuration.  Once initialized the
     Caller should await on `backup_config()` to execute the backup process.
 
-    If the BasicSSHConnector defines `disable_paging` will execute those
-    commands before executinig the `show_running` command.
+    If the BasicSSHConnector defines `pre_get_config` will execute those
+    commands before executinig the `get_config` command.
 
-    If the BasicSSHConnector does not define the `disable_paging` attribute,
-    then only the `show_running` command will be executed.
+    If the BasicSSHConnector does not define the `pre_get_config` attribute,
+    then only the `get_config` command will be executed.
 
 
     Attributes
@@ -37,11 +37,11 @@ class BasicSSHConnector(object):
     cls.PROMPT_PATTERN: re.Pattern
         compiled regular expression this used to find the CLI prompt
 
-    cls.show_running: str
+    cls.get_config: str
         The device CLI command that when executed will produce the output of
         the running configuraiton
 
-    cls.disable_paging: Optional[Union[str,list]]
+    cls.pre_get_config: Optional[Union[str,list]]
         The device CLI command(s) that when execute will disable paging so that
         when the show-running command is executed the output will not be
         blocked with a "--More--" user prompt.
@@ -57,8 +57,8 @@ class BasicSSHConnector(object):
         flags=(re.M | re.I),
     )
 
-    show_running = "show running-config"
-    disable_paging = None
+    get_config = "show running-config"
+    pre_get_config = None
 
     _max_startups_sem4 = asyncio.Semaphore(consts.DEFAULT_MAX_STARTUPS)
 
@@ -79,11 +79,11 @@ class BasicSSHConnector(object):
         self.os_spec = copy(os_spec)
         self.log = get_logger()
 
-        if not self.os_spec.disable_paging:
-            self.os_spec.disable_paging = self.disable_paging
+        if not self.os_spec.pre_get_config:
+            self.os_spec.pre_get_config = self.pre_get_config
 
-        if not self.os_spec.show_running:
-            self.os_spec.show_running = self.show_running
+        if not self.os_spec.get_config:
+            self.os_spec.get_config = self.get_config
 
         self.os_name = host_cfg["os_name"]
 
@@ -91,6 +91,9 @@ class BasicSSHConnector(object):
             "host": self.host_cfg.get("ipaddr") or self.host_cfg.get("host"),
             "known_hosts": None,
         }
+
+        if app_cfg.ssh_configs:
+            self.conn_args.update(app_cfg.ssh_configs)
 
         if os_spec.ssh_configs:
             self.conn_args.update(os_spec.ssh_configs)
@@ -171,10 +174,12 @@ class BasicSSHConnector(object):
     # -------------------------------------------------------------------------
 
     async def get_running_config(self):
-        command = self.os_spec.show_running
+        command = self.os_spec.get_config
+        timeout = self.os_spec.timeout
+        log_msg = f"GET-CONFIG: {self.name} timeout={timeout}"
 
         if not self.process:
-            self.log.info(f"GET-CONFIG: {self.name}")
+            self.log.info(log_msg)
             res = await self.conn.run(command)
             self.conn.close()
             ln_at = res.stdout.find(command) + len(command) + 1
@@ -193,10 +198,9 @@ class BasicSSHConnector(object):
             paging_disabled = True
             self.log.debug(f"AFTER-PRE-GET-RUNNING: {res}")
 
-            self.log.info(f"GET-CONFIG: {self.name}")
-
+            self.log.info(log_msg)
             self.config = await asyncio.wait_for(
-                self.run_command(command), timeout=self.os_spec.timeout
+                self.run_command(command), timeout=timeout
             )
 
         except asyncio.TimeoutError:
@@ -296,7 +300,7 @@ class BasicSSHConnector(object):
                     )
                     self.log.info(f"CONNECTED: {self.name}")
 
-                    if self.os_spec.disable_paging:
+                    if self.os_spec.pre_get_config:
                         self.process = await self.conn.create_process(
                             term_type="vt100", encoding=None
                         )
@@ -342,11 +346,11 @@ class BasicSSHConnector(object):
 
     async def run_disable_paging(self):
         """
-        This coroutine is used to execute each of the `disable_paging` commands
+        This coroutine is used to execute each of the `pre_get_config` commands
         so that the CLI will not prompt for "--More--" output.
         """
 
-        disable_paging_commands = self.os_spec.disable_paging
+        disable_paging_commands = self.os_spec.pre_get_config
         if not isinstance(disable_paging_commands, list):
             disable_paging_commands = [disable_paging_commands]
 

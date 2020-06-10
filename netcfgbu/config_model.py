@@ -72,13 +72,12 @@ class Defaults(NoExtraBaseModel, BaseSettings):
 
 
 class OSNameSpec(NoExtraBaseModel):
-    name: Optional[str]
     credentials: Optional[List[Credential]]
-    disable_paging: Optional[Union[str, List[str]]]
+    pre_get_config: Optional[Union[str, List[str]]]
+    get_config: Optional[str]
     connection: Optional[str]
-    show_running: Optional[str]
     linter: Optional[str]
-    timeout: PositiveInt = Field(consts.DEFAULT_LOGIN_TIMEOUT)
+    timeout: PositiveInt = Field(consts.DEFAULT_GETCONFIG_TIMEOUT)
     ssh_configs: Optional[Dict]
 
 
@@ -109,4 +108,5 @@ class AppConfig(NoExtraBaseModel):
     os_name: Optional[Dict[str, OSNameSpec]]
     inventory: Optional[List[InventorySpec]]
     linters: Optional[Dict[str, LinterSpec]]
-    logging: Dict
+    logging: Optional[Dict]
+    ssh_configs: Optional[Dict]
