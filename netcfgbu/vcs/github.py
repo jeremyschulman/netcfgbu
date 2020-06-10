@@ -43,17 +43,19 @@ def git_init(gh_cfg: GithubSpec, configs_dir: Path):
     token = gh_cfg.token.get_secret_value()
     repo_url = f"https://{user}:{token}@{gh_cfg.github}/{gh_cfg.repo}.git"
 
-    run_args = dict(stdin=PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True, cwd=configs_dir)
+    run_args = dict(
+        stdin=PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True, cwd=configs_dir
+    )
     args = [git_bin, "init"]
 
     proc = run(args, **run_args)
     assert proc.returncode == 0, "git init failed: %s" % proc.stderr
 
-    args = [git_bin, 'remote', 'add', 'origin', repo_url]
+    args = [git_bin, "remote", "add", "origin", repo_url]
     proc = run(args, **run_args)
     assert proc.returncode == 0, "git remote failed: %s" % proc.stderr
 
-    args = [git_bin, 'pull', 'origin', 'master']
+    args = [git_bin, "pull", "origin", "master"]
     proc = run(args, **run_args)
     assert proc.returncode == 0, "git pull failed: %s" % proc.stderr
 
@@ -75,4 +77,3 @@ def vcs_setup(app_cfg: AppConfig):
 
     # configs_dir exists, is not empty, but not repo, so we need to setup
     git_init(gh_cfg, configs_dir)
-
