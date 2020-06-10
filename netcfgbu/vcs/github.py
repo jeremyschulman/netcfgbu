@@ -31,7 +31,9 @@ def git_clone(gh_cfg: GithubSpec, configs_dir: Path):
 
     repo_url = f"https://{user}@{gh_cfg.github}/{gh_cfg.repo}.git"
 
-    # need to use pexpect to interact with the password prompt ;-(
+    # need to use pexpect to interact with the password prompt so we do not
+    # store the token value as plaintext in the .git/config file.
+
     args = ["clone", repo_url, str(configs_dir)]
     proc = pexpect.spawn(command=git_bin, args=args)
     proc.expect("Password for")
@@ -62,10 +64,20 @@ def git_init(gh_cfg: GithubSpec, configs_dir: Path):
     proc = run(args, **run_args)
     assert proc.returncode == 0, "git remote failed: %s" % proc.stderr
 
-    args = [git_bin, "pull", "origin", "master"]
-    run_args.pop('stdin')
-    proc = run(args, input=token, **run_args)
-    assert proc.returncode == 0, "git pull failed: %s" % proc.stderr
+    # need to use pexpect to interact with the password prompt so we do not
+    # store the token value as plaintext in the .git/config file.
+
+    args = ["pull", "origin", "master"]
+    proc = pexpect.spawn(command=git_bin, args=args, cwd=configs_dir)
+    proc.expect("Password for")
+    proc.sendline(token)
+    proc.expect(pexpect.EOF)
+    proc.close()
+
+    # TODO: check proc.status == 0, output can be exampined by
+    #       looking at proc.before.decode()
+
+    git_config(user, configs_dir)
 
 
 def vcs_setup(app_cfg: AppConfig):
