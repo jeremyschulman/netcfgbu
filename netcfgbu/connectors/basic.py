@@ -9,9 +9,10 @@ import aiofiles
 import asyncssh
 
 
+from netcfgbu.config_model import AppConfig, OSNameSpec, Credential
 from netcfgbu.logger import get_logger
 from netcfgbu import consts
-
+from netcfgbu import linter
 
 __all__ = ["BasicSSHConnector", "set_max_startups"]
 
@@ -24,11 +25,11 @@ class BasicSSHConnector(object):
     specification, and the application configuration.  Once initialized the
     Caller should await on `backup_config()` to execute the backup process.
 
-    If the BasicSSHConnector defines `disable_paging` will execute those
-    commands before executinig the `show_running` command.
+    If the BasicSSHConnector defines `pre_get_config` will execute those
+    commands before executinig the `get_config` command.
 
-    If the BasicSSHConnector does not define the `disable_paging` attribute,
-    then only the `show_running` command will be executed.
+    If the BasicSSHConnector does not define the `pre_get_config` attribute,
+    then only the `get_config` command will be executed.
 
 
     Attributes
@@ -36,30 +37,32 @@ class BasicSSHConnector(object):
     cls.PROMPT_PATTERN: re.Pattern
         compiled regular expression this used to find the CLI prompt
 
-    cls.show_running: str
+    cls.get_config: str
         The device CLI command that when executed will produce the output of
         the running configuraiton
 
-    cls.disable_paging: Optional[Union[str,list]]
+    cls.pre_get_config: Optional[Union[str,list]]
         The device CLI command(s) that when execute will disable paging so that
         when the show-running command is executed the output will not be
         blocked with a "--More--" user prompt.
     """
 
     PROMPT_PATTERN = re.compile(
-        "^\r?(["
-        + consts.PROMPT_VALID_CHARS
-        + "]{%s,%s}" % (1, consts.PROMPT_MAX_CHARS)
-        + r"\s*[#>$])\s*$",
+        (
+            "^\r?(["
+            + consts.PROMPT_VALID_CHARS
+            + "]{%s,%s}" % (1, consts.PROMPT_MAX_CHARS)
+            + r"\s*[#>$])\s*$"
+        ).encode("utf-8"),
         flags=(re.M | re.I),
     )
 
-    show_running = "show running-config"
-    disable_paging = None
+    get_config = "show running-config"
+    pre_get_config = None
 
     _max_startups_sem4 = asyncio.Semaphore(consts.DEFAULT_MAX_STARTUPS)
 
-    def __init__(self, host_cfg: dict, os_spec: dict, app_cfg: dict):
+    def __init__(self, host_cfg: dict, os_spec: OSNameSpec, app_cfg: AppConfig):
         """
         Initialize the backup spec with information about the host, the os_spec assigned
         to the host, and the command app configuration.
@@ -76,14 +79,24 @@ class BasicSSHConnector(object):
         self.os_spec = copy(os_spec)
         self.log = get_logger()
 
-        self.os_spec.setdefault("disable_paging", self.disable_paging)
-        self.os_spec.setdefault("show_running", self.show_running)
+        if not self.os_spec.pre_get_config:
+            self.os_spec.pre_get_config = self.pre_get_config
+
+        if not self.os_spec.get_config:
+            self.os_spec.get_config = self.get_config
+
         self.os_name = host_cfg["os_name"]
 
         self.conn_args = {
             "host": self.host_cfg.get("ipaddr") or self.host_cfg.get("host"),
             "known_hosts": None,
         }
+
+        if app_cfg.ssh_configs:
+            self.conn_args.update(app_cfg.ssh_configs)
+
+        if os_spec.ssh_configs:
+            self.conn_args.update(os_spec.ssh_configs)
 
         self._cur_prompt: Optional[str] = None
         self.config = None
@@ -92,6 +105,10 @@ class BasicSSHConnector(object):
 
         self.conn = None
         self.process: Optional[asyncssh.SSHClientProcess] = None
+        self.creds = self._setup_creds()
+
+        if not len(self.creds):
+            raise RuntimeError(f"{self.name}: No credentials")
 
     @classmethod
     def set_max_startups(cls, max_startups):
@@ -139,7 +156,7 @@ class BasicSSHConnector(object):
 
     async def test_login(self, timeout=None) -> Optional[str]:
         login_as = None
-        self.os_spec["timeout"] = timeout
+        self.os_spec.timeout = timeout
 
         try:
             async with await self.login():
@@ -157,10 +174,12 @@ class BasicSSHConnector(object):
     # -------------------------------------------------------------------------
 
     async def get_running_config(self):
-        command = self.os_spec["show_running"]
-        self.log.info(f"GET-CONFIG: {self.name}")
+        command = self.os_spec.get_config
+        timeout = self.os_spec.timeout
+        log_msg = f"GET-CONFIG: {self.name} timeout={timeout}"
 
         if not self.process:
+            self.log.info(log_msg)
             res = await self.conn.run(command)
             self.conn.close()
             ln_at = res.stdout.find(command) + len(command) + 1
@@ -171,20 +190,28 @@ class BasicSSHConnector(object):
         paging_disabled = False
 
         try:
-            await asyncio.wait_for(self.read_until_prompt(), timeout=10)
+            res = await asyncio.wait_for(self.read_until_prompt(), timeout=10)
             at_prompt = True
+            self.log.debug(f"AT-PROMPT: {res}")
 
-            await asyncio.wait_for(self.run_disable_paging(), timeout=10)
+            res = await asyncio.wait_for(self.run_disable_paging(), timeout=10)
             paging_disabled = True
+            self.log.debug(f"AFTER-PRE-GET-RUNNING: {res}")
 
-            self.log.info(f"GET-CONFIG: {self.name}")
-            self.config = await asyncio.wait_for(self.run_command(command), timeout=60)
+            self.log.info(log_msg)
+            self.config = await asyncio.wait_for(
+                self.run_command(command), timeout=timeout
+            )
 
         except asyncio.TimeoutError:
-            raise asyncio.TimeoutError(
-                "Timeout when getting running configuraiton",
-                dict(at_prompt=at_prompt, paging_disabled=paging_disabled),
-            )
+            if not at_prompt:
+                msg = "Timeout awaiting prompt"
+            elif not paging_disabled:
+                msg = "Timeout executing pre-get-running commands"
+            else:
+                msg = "Timeout getting running configuration"
+
+            raise asyncio.TimeoutError(msg)
 
     # -------------------------------------------------------------------------
     #
@@ -198,22 +225,22 @@ class BasicSSHConnector(object):
         # use credential from inventory host record first, if defined
         if all(key in self.host_cfg for key in ("username", "password")):
             creds.append(
-                dict(
+                Credential(
                     username=self.host_cfg.get("username"),
                     password=self.host_cfg.get("password"),
                 )
             )
 
-        # add the default credentials
-        creds.append(self.app_cfg["defaults"]["credentials"])
-
         # add any addition credentials defined in the os spec
-        if os_creds := self.os_spec.get("credentials"):
-            creds.extend(os_creds)
+        if self.os_spec.credentials:
+            creds.extend(self.os_spec.credentials)
+
+        # add the default credentials
+        creds.append(self.app_cfg.defaults.credentials)
 
         # add any additional global credentials
-        if gl_creds := self.app_cfg.get("credentials"):
-            creds.extend(gl_creds)
+        if self.app_cfg.credentials:
+            creds.extend(self.app_cfg.credentials)
 
         return creds
 
@@ -245,20 +272,21 @@ class BasicSSHConnector(object):
             When attempting to connect to a device exceeds the timeout value.
         """
 
-        creds = self._setup_creds()
-        if not creds[0]:
-            raise RuntimeError(f"{self.name}: No credentials")
-
-        timeout = self.os_spec.get("timeout") or consts.DEFAULT_LOGIN_TIMEOUT
+        timeout: int = self.os_spec.timeout
 
         # interate through all of the credential options until one is accepted.
         # the number of max setup connections is controlled by a semaphore
         # instance so that the server running this code is not overwhelmed.
 
-        for try_cred in creds:
+        for try_cred in self.creds:
             try:
                 self.failed = None
-                self.conn_args.update(try_cred)
+                self.conn_args.update(
+                    {
+                        "username": try_cred.username,
+                        "password": try_cred.password.get_secret_value(),
+                    }
+                )
                 async with self.__class__._max_startups_sem4:
 
                     login_msg = (
@@ -272,8 +300,10 @@ class BasicSSHConnector(object):
                     )
                     self.log.info(f"CONNECTED: {self.name}")
 
-                    if self.os_spec.get("disable_paging"):
-                        self.process = await self.conn.create_process(term_type="vt100")
+                    if self.os_spec.pre_get_config:
+                        self.process = await self.conn.create_process(
+                            term_type="vt100", encoding=None
+                        )
 
                     return self.conn
 
@@ -285,7 +315,7 @@ class BasicSSHConnector(object):
         # attempts.
 
         raise asyncssh.PermissionDenied(
-            reason=f"No valid username/password ({len(creds)})"
+            reason=f"No valid username/password, attempted {len(self.creds)} credentials."
         )
 
     async def close(self):
@@ -300,27 +330,27 @@ class BasicSSHConnector(object):
     # -------------------------------------------------------------------------
 
     async def read_until_prompt(self):
-        output = ""
+        output = b""
         while True:
             output += await self.process.stdout.read(io.DEFAULT_BUFFER_SIZE)
-            nl_at = output.rfind("\n")
+            nl_at = output.rfind(b"\n")
             if mobj := self.PROMPT_PATTERN.match(output[nl_at + 1 :]):
                 self._cur_prompt = mobj.group(1)
                 return output[0:nl_at]
 
     async def run_command(self, command):
         wr_cmd = command + "\n"
-        self.process.stdin.write(wr_cmd)
+        self.process.stdin.write(wr_cmd.encode("utf-8"))
         output = await self.read_until_prompt()
         return output[len(wr_cmd) + 1 :]
 
     async def run_disable_paging(self):
         """
-        This coroutine is used to execute each of the `disable_paging` commands
+        This coroutine is used to execute each of the `pre_get_config` commands
         so that the CLI will not prompt for "--More--" output.
         """
 
-        disable_paging_commands = self.os_spec["disable_paging"]
+        disable_paging_commands = self.os_spec.pre_get_config
         if not isinstance(disable_paging_commands, list):
             disable_paging_commands = [disable_paging_commands]
 
@@ -335,11 +365,22 @@ class BasicSSHConnector(object):
     # -------------------------------------------------------------------------
 
     async def save_config(self):
-        self.save_file = (
-            Path(self.app_cfg["defaults"]["configs_dir"]) / f"{self.name}.cfg"
-        )
+        if isinstance(self.config, bytes):
+            self.config = self.config.decode("utf-8", "ignore")
+
+        config_content = self.config.replace("\r", "")
+
+        if linter_name := self.os_spec.linter:
+            lint_spec = self.app_cfg.linters[linter_name]
+            orig = config_content
+            config_content = linter.lint_content(config_content, lint_spec)
+            if orig == config_content:
+                self.log.debug(f"LINT no change on {self.name}")
+
+        self.save_file = Path(self.app_cfg.defaults.configs_dir) / f"{self.name}.cfg"
+
         async with aiofiles.open(self.save_file, mode="w+") as ofile:
-            await ofile.write(self.config.replace("\r", ""))
+            await ofile.write(config_content)
             await ofile.write("\n")
 
 

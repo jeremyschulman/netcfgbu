@@ -4,10 +4,13 @@
 # System Imports
 # -----------------------------------------------------------------------------
 
+from typing import List
 import sys
+from pathlib import Path
 import asyncio
 from importlib import metadata
 from collections import defaultdict, Counter
+from functools import reduce
 from errno import errorcode
 from operator import itemgetter
 from textwrap import indent
@@ -29,11 +32,13 @@ from first import first
 
 import netcfgbu
 from netcfgbu import config
+from netcfgbu.config_model import InventorySpec
 from netcfgbu.connectors import set_max_startups
-from netcfgbu.os_specs import make_host_os_spec
+from netcfgbu.os_specs import make_host_connector, get_os_spec
 from netcfgbu.logger import get_logger, stop_aiologging
 from netcfgbu.probe import probe
 from netcfgbu.aiofut import as_completed
+from netcfgbu.linter import lint_file
 
 import netcfgbu.inventory
 
@@ -154,7 +159,7 @@ def exec_backup(app_cfg, inventory_recs):
     log = get_logger()
 
     backup_tasks = {
-        make_host_os_spec(rec, app_cfg).backup_config(): rec for rec in inventory_recs
+        make_host_connector(rec, app_cfg).backup_config(): rec for rec in inventory_recs
     }
 
     total = len(backup_tasks)
@@ -175,6 +180,9 @@ def exec_backup(app_cfg, inventory_recs):
                 report.task_results[ok].append((rec, res))
 
             except Exception as exc:
+                import traceback
+
+                traceback.print_exc()
                 ok = False
                 report.task_results[False].append((rec, exc))
 
@@ -197,7 +205,7 @@ def exec_backup(app_cfg, inventory_recs):
 
 def exec_test_login(app_cfg, inventory_recs, cli_opts):
     login_tasks = {
-        make_host_os_spec(rec, app_cfg).test_login(timeout=cli_opts["timeout"]): rec
+        make_host_connector(rec, app_cfg).test_login(timeout=cli_opts["timeout"]): rec
         for rec in inventory_recs
     }
 
@@ -238,6 +246,56 @@ def exec_test_login(app_cfg, inventory_recs, cli_opts):
     loop = asyncio.get_event_loop()
     report.start_timing()
     loop.run_until_complete(process_batch())
+    report.stop_timing()
+    stop_aiologging()
+    report.print_report()
+
+
+# -----------------------------------------------------------------------------
+#
+#                                EXEC LINT
+#
+# -----------------------------------------------------------------------------
+
+
+def exec_lint(app_cfg, inventory):
+
+    lint_hosts = [
+        (rec, os_spec["linter"])
+        for rec in inventory
+        if "linter" in (os_spec := get_os_spec(rec, app_cfg))
+    ]
+
+    try:
+        configs_dir = Path(app_cfg["defaults"]["configs_dir"])
+    except IndexError:
+        configs_dir = Path().cwd()
+
+    log = get_logger()
+
+    report = Report()
+
+    report.start_timing()
+    for rec, linter in lint_hosts:
+        lint_spec = app_cfg["linters"][linter]
+        config_fileobj = configs_dir.joinpath(rec["host"] + ".cfg")
+        if not config_fileobj.exists():
+            log.warning(f"File not found: {config_fileobj.name}, skipping.")
+            report.task_results[False].append(
+                (rec, FileNotFoundError(config_fileobj.name))
+            )
+            continue
+
+        try:
+            lint_file(config_fileobj, lint_spec)
+        except RuntimeWarning as exc:
+            log.warning(exc.args[0])
+            # do not count as failure
+            report.task_results[True].append((rec, exc))
+
+        log.info(f"LINTED: {config_fileobj.name}")
+        report.task_results[True].append((rec,))
+
     report.stop_timing()
     stop_aiologging()
     report.print_report()
@@ -291,7 +349,7 @@ def exec_probe(inventory, timeout=None):
 
 # -----------------------------------------------------------------------------
 #
-#                                    CLI
+#                           CLI Custom Click Commands
 #
 # -----------------------------------------------------------------------------
 
@@ -312,6 +370,17 @@ class WithInventoryCommand(click.Command):
 
         try:
             app_cfg = ctx.obj["app_cfg"] = config.load(fileio=ctx.params["config"])
+
+            if debug_ssh_lvl := ctx.params.get("debug_ssh"):
+                from asyncssh import logging as assh_lgr
+                import logging
+
+                assh_lgr.set_log_level(logging.DEBUG)
+                assh_lgr.set_debug_level(debug_ssh_lvl)
+
+            if ctx.params["inventory"]:
+                ctx.obj["app_cfg"].defaults.inventory = ctx.params["inventory"]
+
             ctx.obj["inventory_recs"] = netcfgbu.inventory.load(
                 app_cfg=app_cfg,
                 limits=ctx.params["limit"],
@@ -321,13 +390,20 @@ class WithInventoryCommand(click.Command):
         except FileNotFoundError as exc:
             sys.exit(f"File not found: {exc.filename}")
 
-        except Exception as exc:
+        except RuntimeError as exc:
             ctx.fail(f"{exc.args[0]}")
 
         if not ctx.obj["inventory_recs"]:
             sys.exit("No inventory matching limits.")
 
         super().invoke(ctx)
+
+
+# -----------------------------------------------------------------------------
+#
+#                                CLI Options
+#
+# -----------------------------------------------------------------------------
 
 
 opt_config_file = click.option(
@@ -339,13 +415,28 @@ opt_config_file = click.option(
     default="netcfgbu.toml",
 )
 
+# -----------------------------------------------------------------------------
+# Inventory Options
+# -----------------------------------------------------------------------------
+
+opt_inventory = click.option(
+    "--inventory", "-i", help="Inventory file-name", envvar="NETCFGBU_INVENTORY"
+)
+
 opt_limits = click.option(
-    "--limit", "-l", "--include", multiple=True, help="limit inventory",
+    "--limit", "-l", "--include", multiple=True, help="limit/include in inventory",
 )
 
 opt_excludes = click.option(
     "--exclude", "-e", multiple=True, help="exclude from inventory",
 )
+
+
+def opts_inventory(in_fn_deco):
+    return reduce(
+        lambda _d, fn: fn(_d), [opt_inventory, opt_limits, opt_excludes], in_fn_deco
+    )
+
 
 opt_batch = click.option(
     "--batch",
@@ -358,6 +449,16 @@ opt_timeout = click.option(
     "--timeout", "-t", help="timeout(s)", type=click.IntRange(0, 5 * 60)
 )
 
+opt_debug_ssh = click.option(
+    "--debug-ssh", help="enable SSH debugging", type=click.IntRange(1, 3)
+)
+
+# -----------------------------------------------------------------------------
+#
+#                                CLI Commmands
+#
+# -----------------------------------------------------------------------------
+
 
 @click.group()
 @click.version_option(version=VERSION)
@@ -367,8 +468,8 @@ def cli():
 
 @cli.command(name="backup", cls=WithInventoryCommand)
 @opt_config_file
-@opt_limits
-@opt_excludes
+@opts_inventory
+@opt_debug_ssh
 @opt_batch
 @click.pass_context
 def cli_backup(ctx, **_cli_opts):
@@ -385,8 +486,7 @@ def cli_backup(ctx, **_cli_opts):
 
 @cli.command(name="probe", cls=WithInventoryCommand)
 @opt_config_file
-@opt_limits
-@opt_excludes
+@opts_inventory
 @opt_timeout
 @click.pass_context
 def cli_check(ctx, **cli_opts):
@@ -406,10 +506,10 @@ def cli_check(ctx, **cli_opts):
 
 @cli.command(name="login", cls=WithInventoryCommand)
 @opt_config_file
-@opt_limits
-@opt_excludes
+@opts_inventory
 @opt_timeout
 @opt_batch
+@opt_debug_ssh
 @click.pass_context
 def cli_login(ctx, **cli_opts):
     """
@@ -434,8 +534,7 @@ def cli_inventory():
 
 @cli_inventory.command("ls", cls=WithInventoryCommand)
 @opt_config_file
-@opt_limits
-@opt_excludes
+@opts_inventory
 @click.option("--brief", "-b", is_flag=True)
 @click.pass_context
 def cli_inventory_list(ctx, **cli_opts):
@@ -482,20 +581,40 @@ def cli_inventory_build(ctx, **cli_opts):
     If the netcfgbu configuraiton file contains inventory definitions then you
     can use this command to the script to build the inventory.
     """
-    from netcfgbu.cli.inventory import build
-    inv_secs = ctx.obj['app_cfg'].get('inventory')
+    from netcfgbu.inventory import build
+
+    inv_secs: List[InventorySpec] = ctx.obj["app_cfg"].inventory
+
     if not inv_secs:
         sys.exit("No inventory sections defined in configuration.")
 
-    if inv_name := cli_opts['name']:
-        inv_df = first(inv for inv in inv_secs if inv.get('name', '') == inv_name)
+    if inv_name := cli_opts["name"]:
+        inv_df = first(inv for inv in inv_secs if getattr(inv, "name", "") == inv_name)
     else:
-        inv_df = ctx.obj["app_cfg"]["inventory"][0]
+        inv_df = inv_secs[0]
 
     if not inv_df:
         sys.exit("Inventory not defined in configuration file")
 
     build(inv_df)
+
+
+# -----------------------------------------------------------------------------
+#                            Lint Commands
+# -----------------------------------------------------------------------------
+
+
+@cli.command(name="lint", cls=WithInventoryCommand)
+@opt_config_file
+@opts_inventory
+@click.pass_context
+def cli_lint(ctx, **_cli_opts):
+    """
+    Remove unwanted content from network config files.
+    """
+    exec_lint(
+        app_cfg=ctx.obj["app_cfg"], inventory=ctx.obj["inventory_recs"],
+    )
 
 
 if __name__ == "__main__":
