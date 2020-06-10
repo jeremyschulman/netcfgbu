@@ -1,8 +1,17 @@
+"""
+This file contains the filtering functions that are using to process the
+'--include' and '--exclude' command line options.  The code in this module is
+not specific to the netcfgbu inventory column names, can could be re-used for
+other CSV related tools and use-cases.
+"""
 import re
 import operator
 from pathlib import Path
 
 from .filetypes import CommentedCsvReader
+
+__all__ = ["create_filter"]
+
 
 value_pattern = r"(?P<value>\S+)$"
 file_reg = re.compile(r"@(?P<filename>.+)$")
