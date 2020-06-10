@@ -8,7 +8,14 @@ from itertools import chain
 
 from . import consts
 
-__all__ = ["AppConfig", "Credential", "InventorySpec", "OSNameSpec", "LinterSpec"]
+__all__ = [
+    "AppConfig",
+    "Credential",
+    "InventorySpec",
+    "OSNameSpec",
+    "LinterSpec",
+    "GithubSpec",
+]
 
 _var_re = re.compile(
     r"\${(?P<bname>[a-z0-9_]+)}" r"|" r"\$(?P<name>[^{][a-z_0-9]+)", flags=re.IGNORECASE
