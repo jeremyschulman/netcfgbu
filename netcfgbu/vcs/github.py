@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from subprocess import PIPE, run
 from netcfgbu.config_model import AppConfig, GithubSpec
+import pexpect
 
 git_bin = "git"
 
@@ -27,13 +28,19 @@ def git_config(user: str, configs_dir: Path):
 def git_clone(gh_cfg: GithubSpec, configs_dir: Path):
     user = gh_cfg.username or os.environ["USER"]
     token = gh_cfg.token.get_secret_value()
-    repo_url = f"https://{user}:{token}@{gh_cfg.github}/{gh_cfg.repo}.git"
 
-    args = [git_bin, "clone", repo_url, str(configs_dir)]
+    repo_url = f"https://{user}@{gh_cfg.github}/{gh_cfg.repo}.git"
 
-    run_args = dict(stdin=PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-    proc = run(args, **run_args)
-    assert proc.returncode == 0, "failed to clone: %s" % proc.stderr
+    # need to use pexpect to interact with the password prompt ;-(
+    args = ["clone", repo_url, str(configs_dir)]
+    proc = pexpect.spawn(command=git_bin, args=args)
+    proc.expect("Password for")
+    proc.sendline(token)
+    proc.expect(pexpect.EOF)
+    proc.close()
+
+    # TODO: check proc.status == 0, output can be exampined by
+    #       looking at proc.before.decode()
 
     git_config(user, configs_dir)
 
@@ -41,7 +48,7 @@ def git_clone(gh_cfg: GithubSpec, configs_dir: Path):
 def git_init(gh_cfg: GithubSpec, configs_dir: Path):
     user = gh_cfg.username or os.environ["USER"]
     token = gh_cfg.token.get_secret_value()
-    repo_url = f"https://{user}:{token}@{gh_cfg.github}/{gh_cfg.repo}.git"
+    repo_url = f"https://{user}@{gh_cfg.github}/{gh_cfg.repo}.git"
 
     run_args = dict(
         stdin=PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True, cwd=configs_dir
@@ -56,7 +63,8 @@ def git_init(gh_cfg: GithubSpec, configs_dir: Path):
     assert proc.returncode == 0, "git remote failed: %s" % proc.stderr
 
     args = [git_bin, "pull", "origin", "master"]
-    proc = run(args, **run_args)
+    run_args.pop('stdin')
+    proc = run(args, input=token, **run_args)
     assert proc.returncode == 0, "git pull failed: %s" % proc.stderr
 
 
