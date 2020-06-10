@@ -25,7 +25,7 @@ code changes to `netcfgbu`.
 
 All of the default values support the use of environment variables as shown
 in the example below.  All of these defaults also support the use
-of `NETCFGBU_` enviornment variables as described [here](environment_variables.md).
+of `NETCFGBU_` environment variables as described [here](environment_variables.md).
 
 **`inventory`**<br/>
 File path to the inventory CSV. 
@@ -34,7 +34,7 @@ File path to the inventory CSV.
 The default login user-name
 
 **`credentials.password`**<br/>
-The default login password.  You should always use envrionment variables here,
+The default login password.  You should always use environment variables here,
 but you are not required to do so.
 
 Example:

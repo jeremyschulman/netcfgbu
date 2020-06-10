@@ -18,7 +18,7 @@ required.
 create this inventory dynamically from one or more sources, for example Netbox.
 I want the ability to filter this inventory with limit and exclude constraints.
 
-* I may need to try multiple SSH credendials.  I must not store my passwords in
+* I may need to try multiple SSH credentials.  I must not store my passwords in
 any configuration file, so this tool must acquire passwords via environment
 variables.
 
@@ -67,7 +67,7 @@ Commands:
   backup     Backup network configurations.
   inventory  [ls, build, ...]
   login      Verify SSH login to devices.
-  probe      Probe device for SSH reachablility.
+  probe      Probe device for SSH reachability.
 ```
 
 # Setup
@@ -82,7 +82,7 @@ environment variable `NETCFGBU_CONFIG`
 At a minimum you need to designate the [inventory](docs/inventory.md) file and
 a default set of SSH login credentials.  The network device configs will be
 stored in the current working directory, or as specified in the `configs_dir`
-option.  The configuration-file supports the use of enviornment variables.
+option.  The configuration-file supports the use of environment variables.
 
 Example:
 ```toml

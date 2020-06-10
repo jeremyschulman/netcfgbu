@@ -10,7 +10,7 @@ other network devices that behave the same way as the WLC, and you could use the
 for the WLC and this other device type.
 
 To use a custom connector type you can add the `connection` value in
-the OS secton of your [configuration file](configuration-file.md).  
+the OS section of your [configuration file](configuration-file.md).  
 
 Example for Cisco WLC:
 ```toml
@@ -24,7 +24,7 @@ The `connection` value identifies the python module location where this
 connector can be found. In the above example, you can find
 [LoginPromptUserPass here](../netcfgbu/connectors/ssh.py). This approach
 allows you to use a connector that is either packaged with `netcfgbu` or use
-one that can be found in another python package should that be neccesary.
+one that can be found in another python package should that be necessary.
 
 If you have a need for a custom connector and would like it written for you,
 please [open an issue](https://github.com/jeremyschulman/netcfgbu/issues).

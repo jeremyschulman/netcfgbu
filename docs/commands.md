@@ -4,14 +4,14 @@ This page presents an overview of the `netcfgbu` commands.  For full command det
 CLI `--help` option.
 
 For any devices that fail during a command, the `netcfgbu` tool will generate a
-file called `failures.csv` Yyou can use this file in future command to retry
+file called `failures.csv` You can use this file in future command to retry
 using the `--limit @failures.csv`.  Or you can use this file to exclude these
 devices using `--exlcude @failures.csv`.  For more details see
 [filtering](filtering.md)
 
 **inventory**<br/>
 The `inventory ls` command is used to list the contents of the current inventory file.  This
-is usedful for when you want to test your filtering expresssions before you try to run a backup.
+is useful for when you want to test your filtering expressions before you try to run a backup.
 
 Example:
 ```shell script
@@ -37,7 +37,7 @@ $ netcfgbu probe
 
 **login**<br/>
 The `login` command is used to determine if the `netcfgbu` is able to authenticate with the
-device SSH, and reports the credential username value that was used.  This is usedful to
+device SSH, and reports the credential username value that was used.  This is useful to
 ensure that not only is the device reachable with SSH open, but the that `netcfgbu` is configured
 with the correct credentials to allow a connection.
 

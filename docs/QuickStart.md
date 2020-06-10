@@ -1,6 +1,6 @@
 # Quick Start
 
-If you are a Netbox user you can dyanamically build the inventory.csv file as
+If you are a Netbox user you can dynamically build the inventory.csv file as
 described [here](../netbox/README.md).
 
 You can use the provided configuration file [netcfgbu.toml](../netcfgbu.toml) as
