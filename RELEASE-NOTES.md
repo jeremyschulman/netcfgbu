@@ -11,7 +11,7 @@
    * Refactored config-file options
 
 #### v0.1.0 (2020-Jun-05)
-Minimum viable package features that will backup configuraiton files from
+Minimum viable package features that will backup configuration files from
 network devices and store the contents onto your server.
 
 This version does not support the following features:

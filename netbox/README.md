@@ -1,6 +1,6 @@
 # Netbox Integration
 
-As a User of Netbox I want to use the Devices as the inventory for my backup process.  I want to dyanmically
+As a User of Netbox I want to use the Devices as the inventory for my backup process.  I want to dynamically
 create the `netcfgbu` inventory.csv file based on Netbox inventory filters such as site, region, or tags.  I
 only want to include devices that are in the "Active" status and have a Primary IP address assigned.
 
@@ -25,7 +25,7 @@ optional arguments:
 ## Setup
 
 #### Environment
-To use the `netbox_inventory.py` script you will need to export two enviornment variables:
+To use the `netbox_inventory.py` script you will need to export two environment variables:
 
 **NETBOX_ADDR**<br/>
 The URL to your netbox server, for example: "https://netbox.mycorp.com"
@@ -35,11 +35,11 @@ The Netbox API token that has read access to the system.
 
 #### Configuration File
     
-Ensure your `netcfgbu.toml` file includes an `[ineventory]` definition to execute the script to generate 
+Ensure your `netcfgbu.toml` file includes an `[inventory]` definition to execute the script to generate 
 the inventory.csv file.  
 
 The following example has the script located in /usr/local/bin, will exclude
-any device that has a tag "no-backup", and will saave the contents to the file
+any device that has a tag "no-backup", and will save the contents to the file
 "inventory.csv"
 
 Example:
