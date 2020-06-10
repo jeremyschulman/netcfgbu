@@ -21,18 +21,34 @@ import sys
 import argparse
 import os
 import csv
+from functools import lru_cache
 
 import requests  # noqa
 from urllib3 import disable_warnings  # noqa
 
 
-disable_warnings()
+CSV_FIELD_NAMES = ["host", "ipaddr", "os_name", "role", "site", "region"]
+
+
+def rec_to_csv(rec):
+    hostname = rec["name"]
+    ipaddr = rec["primary_ip"]["address"].split("/")[0]
+    platform = rec["platform"]
+    os_name = platform["slug"] if platform else "N/A"
+    role = rec["device_role"]["slug"]
+    site = rec["site"]["slug"]
+    region = get_site(site)["region"]["slug"]
+
+    return [hostname, ipaddr, os_name, role, site, region]
 
 
 def cli():
+    """ Create CLI option parser, parse User inputs and return results """
     options_parser = argparse.ArgumentParser()
     options_parser.add_argument("--site", action="store", help="limit devices to site")
-    options_parser.add_argument("--region", action="store", help="limit devices to region")
+    options_parser.add_argument(
+        "--region", action="store", help="limit devices to region"
+    )
     options_parser.add_argument(
         "--role", action="append", help="limit devices with role(s)"
     )
@@ -66,23 +82,26 @@ class NetBoxSession(requests.Session):
         return super(NetBoxSession, self).prepare_request(request)
 
 
+netbox: NetBoxSession = None
+
+
+@lru_cache()
+def get_site(site_slug):
+    res = netbox.get("/api/dcim/sites/", params={"slug": site_slug})
+    res.raise_for_status()
+    return res.json()["results"][0]
+
+
 def create_csv_file(inventory_records, cli_opts):
     csv_wr = csv.writer(cli_opts.output)
-    csv_wr.writerow(["host", "ipaddr", "os_name"])
+    csv_wr.writerow(CSV_FIELD_NAMES)
 
-    for device in inventory_records:
-        hostname = device["name"]
-
-        ipaddr = device["primary_ip"]["address"].split("/")[0]
-
-        # if the platform value is not assigned, then skip this device.
-        if not (platform := device["platform"]):
-            continue
-
-        csv_wr.writerow([hostname, ipaddr, platform["slug"]])
+    for rec in inventory_records:
+        csv_wr.writerow(rec_to_csv(rec))
 
 
 def fetch_inventory(cli_opts):
+    global netbox
 
     try:
         nb_url = os.environ["NETBOX_ADDR"]
@@ -129,12 +148,14 @@ def fetch_inventory(cli_opts):
     filter_functions = []
 
     if cli_opts.role:
+
         def filter_role(dev_dict):
             return dev_dict["device_role"]["slug"] in cli_opts.role
 
         filter_functions.append(filter_role)
 
     if cli_opts.exclude_role:
+
         def filter_ex_role(dev_dict):
             return dev_dict["device_role"]["slug"] not in cli_opts.exclude_role
 
@@ -156,7 +177,12 @@ def fetch_inventory(cli_opts):
     return apply_filters() if filter_functions else iter(device_list)
 
 
-if __name__ == "__main__":
+def build_inventory():
     cli_opts = cli()
     inventory = fetch_inventory(cli_opts)
     create_csv_file(inventory, cli_opts)
+
+
+if __name__ == "__main__":
+    disable_warnings()
+    build_inventory()
