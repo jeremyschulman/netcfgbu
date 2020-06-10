@@ -7,10 +7,9 @@
 
 [[inventory]]
     name = 'netbox'
-    script = """\
-$PROJ_DIR/netcfgbu/netbox/netbox_inventory.py \
-    --exclude-tag no-backup \
-    --output inventory.csv"""
+    script = """$PROJ_DIR/netcfgbu/netbox/netbox_inventory.py \
+        --exclude-tag no-backup --exclude-tag no-ssh \
+        --output inventory.csv"""
 
 # -----------------------------------------------------------------------------
 #                           Credentials
