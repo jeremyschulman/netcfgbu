@@ -561,10 +561,11 @@ SUMMARY: TOTAL={len(inventory_recs)}
     if cli_opts["brief"] is True:
         return
 
+    field_names = inventory_recs[0].keys()
+
     print(
         tabulate(
-            headers=["host", "os_name"],
-            tabular_data=[[rec["host"], rec["os_name"]] for rec in inventory_recs],
+            headers=field_names, tabular_data=[rec.values() for rec in inventory_recs],
         )
     )
 
