@@ -81,6 +81,7 @@ class Defaults(NoExtraBaseModel, BaseSettings):
 class GithubSpec(NoExtraBaseModel):
     github: Optional[str]
     repo: str
+    email: Optional[str]
     username: Optional[EnvExpand]
     password: Optional[EnvExpand]
     token: Optional[EnvSecretStr]

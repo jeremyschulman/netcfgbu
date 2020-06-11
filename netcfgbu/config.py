@@ -42,7 +42,7 @@ def load(*, filepath=None, fileio=None) -> AppConfig:
 
     # load_creds(app_cfg)
 
-    configs_dir = Path(cfg_obj.defaults.configs_dir)
+    configs_dir = Path(cfg_obj.defaults.configs_dir).absolute()
     if not configs_dir.is_dir():
         configs_dir.mkdir()
 
