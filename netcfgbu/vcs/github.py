@@ -1,28 +1,29 @@
 import os
 
 from pathlib import Path
-from subprocess import PIPE, run
 from netcfgbu.config_model import AppConfig, GithubSpec
 import pexpect
 
 git_bin = "git"
 
 
-def git_config(user: str, configs_dir: Path):
+def git_config(user: str, gh_cfg: GithubSpec, configs_dir: Path):
 
-    run_args = dict(stdin=PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-    args = [git_bin, "config", "--local", "user.email", user]
-    run_args["cwd"] = str(configs_dir)
-    proc = run(args, **run_args)
-    assert proc.returncode == 0, "config user.email failed: %s" % proc.stderr
+    config_opts = (
+        ("user.email", user),
+        ("user.name", user),
+        ("push.default", "matching"),
+    )
 
-    args = [git_bin, "config", "--local", "user.name", user]
-    proc = run(args, **run_args)
-    assert proc.returncode == 0, "config user failed: %s" % proc.stderr
+    for cfg_opt, cfg_val in config_opts:
+        output, rc = pexpect.run(
+            command=f"{git_bin} config --local {cfg_opt} {cfg_val}",
+            withexitstatus=True,
+            cwd=configs_dir,
+        )
 
-    args = [git_bin, "config", "--local", "push.default", "matching"]
-    proc = run(args, **run_args)
-    assert proc.returncode == 0, "config push.default failed: %s" % proc.stderr
+        if rc != 0:
+            raise RuntimeError(f"config {cfg_opt} failed: %s" % output.decode())
 
 
 def git_clone(gh_cfg: GithubSpec, configs_dir: Path):
@@ -34,17 +35,18 @@ def git_clone(gh_cfg: GithubSpec, configs_dir: Path):
     # need to use pexpect to interact with the password prompt so we do not
     # store the token value as plaintext in the .git/config file.
 
-    args = ["clone", repo_url, str(configs_dir)]
-    proc = pexpect.spawn(command=git_bin, args=args)
-    proc.expect("Password for")
-    proc.sendline(token)
-    proc.expect(pexpect.EOF)
-    proc.close()
+    output, rc = pexpect.run(
+        command=f"{git_bin} clone {repo_url} {str(configs_dir)}",
+        cwd=configs_dir,
+        withexitstatus=True,
+        timeout=10,
+        events={"Password for": token + "\n"},
+    )
 
-    # TODO: check proc.status == 0, output can be exampined by
-    #       looking at proc.before.decode()
+    if rc != 0:
+        raise RuntimeError(output.decode())
 
-    git_config(user, configs_dir)
+    git_config(user, gh_cfg, configs_dir)
 
 
 def git_init(gh_cfg: GithubSpec, configs_dir: Path):
@@ -52,32 +54,29 @@ def git_init(gh_cfg: GithubSpec, configs_dir: Path):
     token = gh_cfg.token.get_secret_value()
     repo_url = f"https://{user}@{gh_cfg.github}/{gh_cfg.repo}.git"
 
-    run_args = dict(
-        stdin=PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True, cwd=configs_dir
-    )
-    args = [git_bin, "init"]
+    commands = ("init", f"remote add origin {repo_url}")
 
-    proc = run(args, **run_args)
-    assert proc.returncode == 0, "git init failed: %s" % proc.stderr
-
-    args = [git_bin, "remote", "add", "origin", repo_url]
-    proc = run(args, **run_args)
-    assert proc.returncode == 0, "git remote failed: %s" % proc.stderr
+    for cmd in commands:
+        output, rc = pexpect.run(
+            command=f"{git_bin} {cmd}", cwd=configs_dir, withexitstatus=True
+        )
+        if rc != 0:
+            raise RuntimeError(output.decode())
 
     # need to use pexpect to interact with the password prompt so we do not
     # store the token value as plaintext in the .git/config file.
 
-    args = ["pull", "origin", "master"]
-    proc = pexpect.spawn(command=git_bin, args=args, cwd=configs_dir)
-    proc.expect("Password for")
-    proc.sendline(token)
-    proc.expect(pexpect.EOF)
-    proc.close()
+    output, rc = pexpect.run(
+        command=f"{git_bin} pull origin master",
+        cwd=configs_dir,
+        withexitstatus=True,
+        events={"Password for": token + "\n"},
+    )
 
-    # TODO: check proc.status == 0, output can be exampined by
-    #       looking at proc.before.decode()
+    if rc != 0:
+        raise RuntimeError(output.decode())
 
-    git_config(user, configs_dir)
+    git_config(user, gh_cfg, configs_dir)
 
 
 def vcs_setup(app_cfg: AppConfig):
