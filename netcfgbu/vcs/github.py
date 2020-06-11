@@ -18,6 +18,7 @@ import pexpect
 # Private Imports
 # -----------------------------------------------------------------------------
 
+from netcfgbu.logger import get_logger
 from netcfgbu.config_model import GithubSpec
 
 git_bin = "git"
@@ -69,15 +70,49 @@ class GitRunner(object):
     def run(self, cmd: str, authreq=False):
         return [self.run_noauth, self.run_auth][authreq](cmd)  # noqa
 
+    def git_init(self):
+        output = self.run("remote -v") if self.repo_exists else ""
+        if self.repo_url not in output:
+            commands = (("init", False), (f"remote add origin {self.repo_url}", False))
 
-class GitTokenRunner(GitRunner):
+            for cmd, req_auth in commands:
+                self.run(cmd, req_auth)
+
+        self.git_config()
+
+    def git_pull(self):
+        self.run("pull origin master", authreq=True)
+
+    def git_config(self):
+        config = self.config
+
+        config_opts = (
+            ("user.email", config.email or self.user),
+            ("user.name", self.user),
+            ("push.default", "matching"),
+        )
+
+        for cfg_opt, cfg_val in config_opts:
+            self.run(f"config --local {cfg_opt} {cfg_val}")
+
+    def git_clone(self):
+        self.run(f"clone {self.repo_url} {str(self.repo_dir)}", authreq=True)
+        self.git_config()
+
+
+class GitAuthRunner(GitRunner):
+    PASSWORD_PROMPT = "Password for"
+
+    def _get_secret(self):
+        return self.config.token.get_secret_value()
+
     def run_auth(self, cmd):
         output, rc = pexpect.run(
             command=f"{git_bin} {cmd}",
             cwd=self.repo_dir,
             withexitstatus=True,
             encoding="utf-8",
-            events={"Password for": self.config.token.get_secret_value() + "\n"},
+            events={self.PASSWORD_PROMPT: self._get_secret() + "\n"},
         )
 
         if rc != 0:
@@ -86,50 +121,38 @@ class GitTokenRunner(GitRunner):
         return output
 
 
-def git_runner(gh_cfg: GithubSpec, repo_dir: Path) -> GitRunner:
+class GitTokenRunner(GitAuthRunner):
+    # use the default password prompt value
+    pass
 
+
+class GitDeployKeyRunner(GitRunner):
+    def git_config(self):
+        super().git_config()
+        ssh_key = str(Path(self.config.deploy_key).absolute())
+        self.run(
+            f"config --local core.sshCommand 'ssh -i {ssh_key} -o StrictHostKeyChecking=no'"
+        )
+
+
+class GitSecuredDeployKeyRunner(GitDeployKeyRunner, GitAuthRunner):
+    PASSWORD_PROMPT = "Enter passphrase for key"
+
+    def _get_secret(self):
+        return self.config.deploy_passphrase.get_secret_value()
+
+
+def git_runner(gh_cfg: GithubSpec, repo_dir: Path) -> GitRunner:
     if gh_cfg.token:
         return GitTokenRunner(gh_cfg, repo_dir)
 
-    raise RuntimeError("No github runner")
+    elif gh_cfg.deploy_key:
+        if not gh_cfg.deploy_passphrase:
+            return GitDeployKeyRunner(gh_cfg, repo_dir)
+        else:
+            return GitSecuredDeployKeyRunner(gh_cfg, repo_dir)
 
-
-# -----------------------------------------------------------------------------
-#
-#
-#
-# -----------------------------------------------------------------------------
-
-
-def git_config(ghr: GitRunner):
-    config = ghr.config
-
-    config_opts = (
-        ("user.email", config.email or ghr.user),
-        ("user.name", ghr.user),
-        ("push.default", "matching"),
-    )
-
-    for cfg_opt, cfg_val in config_opts:
-        ghr.run(f"config --local {cfg_opt} {cfg_val}")
-
-
-def git_clone(ghr: GitRunner):
-    ghr.run(f"clone {ghr.repo_url} {str(ghr.repo_dir)}", authreq=True)
-    git_config(ghr)
-
-
-def git_init(ghr: GitRunner):
-    commands = (
-        ("init", False),
-        (f"remote add origin {ghr.repo_url}", False),
-        ("pull origin master", True),
-    )
-
-    for cmd, req_auth in commands:
-        ghr.run(cmd, req_auth)
-
-    git_config(ghr)
+    raise RuntimeError("Github config missing authentication settings")
 
 
 # -----------------------------------------------------------------------------
@@ -142,6 +165,8 @@ def git_init(ghr: GitRunner):
 def vcs_update(
     gh_cfg: GithubSpec, repo_dir: Path, tag_name: Optional[str] = None
 ) -> bool:
+    logr = get_logger()
+    logr.info(f"VCS update github: {gh_cfg.repo}")
 
     ghr = git_runner(gh_cfg, repo_dir)
 
@@ -149,8 +174,11 @@ def vcs_update(
         tag_name = tag_name_timestamp()
 
     output = ghr.run("status")
-    if "nothing to commit, working directory clean" in output:
+    if "nothing to commit" in output:
+        logr.info("VCS no changes, skipping")
         return False
+
+    logr.info(f"VCS saving changes, tag={tag_name}")
 
     commands = (
         ("add -A", False),
@@ -167,18 +195,20 @@ def vcs_update(
 
 
 def vcs_prepare(gh_cfg: GithubSpec, repo_dir: Path):
+    logr = get_logger()
+    logr.info(f"VCS prepare github: {gh_cfg.repo}")
 
     ghr = git_runner(gh_cfg, repo_dir)
+    ghr.git_init()
+    ghr.git_pull()
 
-    if ghr.is_repo_empty:
-        git_clone(ghr)
-        return
 
-    if ghr.repo_exists:
-        # the git repo already exists
-        return
+def vcs_status(gh_cfg: GithubSpec, repo_dir: Path):
+    logr = get_logger()
+    logr.info(f"""
+VCS diffs github: {gh_cfg.repo}
+             dir: {str(repo_dir)}
+""")
 
-    # repo directory exists and is not empty, but the .git/ is missing, so we
-    # need to pull down the github repo to initialize the .git/ directory.
-
-    git_init(ghr)
+    ghr = git_runner(gh_cfg, repo_dir)
+    return ghr.run("status")

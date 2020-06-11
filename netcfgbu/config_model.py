@@ -2,9 +2,11 @@ import re
 import os
 from typing import Optional, Union, List, Dict
 from os.path import expandvars
+from itertools import chain
+from pathlib import Path
+
 from pydantic import BaseModel, SecretStr, BaseSettings, PositiveInt, Field, validator
 
-from itertools import chain
 
 from . import consts
 
@@ -78,14 +80,20 @@ class Defaults(NoExtraBaseModel, BaseSettings):
     inventory: Optional[EnvExpand] = Field(..., env="NETCFGBU_INVENTORY")
     credentials: DefaultCredential
 
+    @validator("configs_dir")
+    def _configs_dir(cls, value):
+        return Path(value).absolute()
+
 
 class GithubSpec(NoExtraBaseModel):
-    # github: Optional[str]
+    name: Optional[str]
     repo: str
     email: Optional[str]
     username: Optional[EnvExpand]
     password: Optional[EnvExpand]
     token: Optional[EnvSecretStr]
+    deploy_key: Optional[EnvExpand]
+    deploy_passphrase: Optional[EnvSecretStr]
 
     @validator("repo")
     def validate_repo(cls, repo):

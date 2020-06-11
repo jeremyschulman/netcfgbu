@@ -128,6 +128,17 @@
     repo = "https://github.mlbam.net/jschulman/test-network-configs.git"
     token = "$GIT_TOKEN"
 
+[[vcs]]
+    name = "ssh"
+    repo = "git@github.mlbam.net:jschulman/test-network-configs.git"
+    deploy_key = "$HOME/test-config-backups"
+
+[[vcs]]
+    name = "ssh-pw"
+    repo = "git@github.mlbam.net:jschulman/test-network-configs.git"
+    deploy_key = "$HOME/test-config-backups"
+    deploy_passphrase = "$GITKEY_PASSWORD"
+
 # -----------------------------------------------------------------------------
 # Logging - follows Python format as described
 #   https://docs.python.org/3/library/logging.config.html
