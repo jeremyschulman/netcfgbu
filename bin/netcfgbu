@@ -4,7 +4,6 @@
 # System Imports
 # -----------------------------------------------------------------------------
 
-from typing import List
 import sys
 from pathlib import Path
 import asyncio
@@ -32,13 +31,14 @@ from first import first
 
 import netcfgbu
 from netcfgbu import config
-from netcfgbu.config_model import InventorySpec
+from netcfgbu.config_model import AppConfig
 from netcfgbu.connectors import set_max_startups
 from netcfgbu.os_specs import make_host_connector, get_os_spec
 from netcfgbu.logger import get_logger, stop_aiologging
 from netcfgbu.probe import probe
 from netcfgbu.aiofut import as_completed
 from netcfgbu.linter import lint_file
+from netcfgbu.vcs import github
 
 import netcfgbu.inventory
 
@@ -406,6 +406,13 @@ class WithInventoryCommand(click.Command):
 # -----------------------------------------------------------------------------
 
 
+def get_spec_nameorfirst(spec_list, spec_name=None):
+    if not spec_name:
+        return first(spec_list)
+
+    return first(spec for spec in spec_list if getattr(spec, "name", "") == spec_name)
+
+
 opt_config_file = click.option(
     "-C",
     "--config",
@@ -527,7 +534,7 @@ def cli_login(ctx, **cli_opts):
 @cli.group(name="inventory")
 def cli_inventory():
     """
-    [ls, build, ...]
+    Inventory subcommands.
     """
     pass
 
@@ -572,7 +579,7 @@ SUMMARY: TOTAL={len(inventory_recs)}
 
 @cli_inventory.command("build", cls=WithConfigCommand)
 @opt_config_file
-@click.option("--name", "-n", help="inventory name")
+@click.option("--name", "-n", help="inventory name as defined in config file")
 @click.option("--brief", is_flag=True)
 @click.pass_context
 def cli_inventory_build(ctx, **cli_opts):
@@ -584,38 +591,97 @@ def cli_inventory_build(ctx, **cli_opts):
     """
     from netcfgbu.inventory import build
 
-    inv_secs: List[InventorySpec] = ctx.obj["app_cfg"].inventory
+    app_cfg: AppConfig = ctx.obj["app_cfg"]
 
-    if not inv_secs:
-        sys.exit("No inventory sections defined in configuration.")
+    if not (spec := get_spec_nameorfirst(app_cfg.inventory, cli_opts["name"])):
+        cfgfile = ctx.params["config"].name
+        sys.exit(f"Inventory not defined in configuration file: {cfgfile}")
 
-    if inv_name := cli_opts["name"]:
-        inv_df = first(inv for inv in inv_secs if getattr(inv, "name", "") == inv_name)
-    else:
-        inv_df = inv_secs[0]
-
-    if not inv_df:
-        sys.exit("Inventory not defined in configuration file")
-
-    build(inv_df)
+    build(spec)
 
 
 # -----------------------------------------------------------------------------
 #                            Lint Commands
 # -----------------------------------------------------------------------------
 
+# TODO: Not included as the linting process is automatically done as
+#       part of the get-config process.  That said, in the future we may
+#       provide as --no-lint option for get-config and then provide
+#       lint commands for User post-processing.
+# @cli.command(name="lint", cls=WithInventoryCommand)
+# @opt_config_file
+# @opts_inventory
+# @click.pass_context
+# def cli_lint(ctx, **_cli_opts):
+#     """
+#     Remove unwanted content from network config files.
+#     """
+#     exec_lint(
+#         app_cfg=ctx.obj["app_cfg"], inventory=ctx.obj["inventory_recs"],
+#     )
 
-@cli.command(name="lint", cls=WithInventoryCommand)
+
+# -----------------------------------------------------------------------------
+#                            VCS Commands
+# -----------------------------------------------------------------------------
+
+
+opt_vcs_name = click.option("--name", help="vcs name as defined in config file")
+
+
+@cli.group(name="vcs")
+def cli_vcs():
+    """
+    Version Control System subcommands.
+    """
+    pass
+
+
+@cli_vcs.command(name="prepare", cls=WithConfigCommand)
 @opt_config_file
-@opts_inventory
+@opt_vcs_name
 @click.pass_context
-def cli_lint(ctx, **_cli_opts):
+def cli_vcs_setup(ctx, **cli_opts):
     """
-    Remove unwanted content from network config files.
+    Prepare your system with the VCS repo.
+
+    This command is used to setup your `configs_dir` as the VCS repository
+    so that when you execute the backup process the resulting backup files
+    can be stored in the VCS system.
     """
-    exec_lint(
-        app_cfg=ctx.obj["app_cfg"], inventory=ctx.obj["inventory_recs"],
-    )
+
+    app_cfgs: AppConfig = ctx.obj["app_cfg"]
+
+    if not (spec := get_spec_nameorfirst(app_cfgs.vcs, cli_opts["name"])):
+        cfgfile = ctx.params["config"].name
+        sys.exit(f"No VCS found, check configuration file: {cfgfile}")
+
+    repo_dir = Path(app_cfgs.defaults.configs_dir).absolute()
+    github.vcs_prepare(spec, repo_dir=repo_dir)
+
+
+@cli_vcs.command(name="update", cls=WithConfigCommand)
+@opt_config_file
+@opt_vcs_name
+@click.pass_context
+def cli_vcs_get(ctx, **cli_opts):
+    """
+    Update the VCS repository with changes to network config files.
+
+    After you have run the config backup process you will need to push those
+    changes into the VCS repository.  This command performs the necesssary
+    steps to add changes to the repository and set a release tag.  The release
+    tag by default is the timestamp in the form of
+    "<year><month><day>_<hour><minute><second>"
+    """
+    app_cfgs: AppConfig = ctx.obj["app_cfg"]
+
+    if not (spec := get_spec_nameorfirst(app_cfgs.vcs, cli_opts["name"])):
+        cfgfile = ctx.params["config"].name
+        sys.exit(f"No VCS found, check configuration file: {cfgfile}")
+
+    repo_dir = Path(app_cfgs.defaults.configs_dir).absolute()
+    github.vcs_update(spec, repo_dir=repo_dir)
 
 
 if __name__ == "__main__":

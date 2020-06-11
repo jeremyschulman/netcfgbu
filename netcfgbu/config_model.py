@@ -14,6 +14,7 @@ __all__ = [
     "InventorySpec",
     "OSNameSpec",
     "LinterSpec",
+    "VCSSpec",
     "GithubSpec",
 ]
 
@@ -79,12 +80,25 @@ class Defaults(NoExtraBaseModel, BaseSettings):
 
 
 class GithubSpec(NoExtraBaseModel):
-    github: Optional[str]
+    # github: Optional[str]
     repo: str
     email: Optional[str]
     username: Optional[EnvExpand]
     password: Optional[EnvExpand]
     token: Optional[EnvSecretStr]
+
+    @validator("repo")
+    def validate_repo(cls, repo):
+        expected = ("https:", "git@")
+        if not repo.startswith(expected):
+            raise RuntimeError(
+                f"Bad repo URL [{repo}]: expected to start with {expected}."
+            )
+        return repo
+
+
+# TODO: only github is supported (for now)
+VCSSpec = GithubSpec
 
 
 class OSNameSpec(NoExtraBaseModel):
@@ -126,4 +140,4 @@ class AppConfig(NoExtraBaseModel):
     linters: Optional[Dict[str, LinterSpec]]
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
-    vcs: Dict[str, GithubSpec]
+    vcs: List[VCSSpec]

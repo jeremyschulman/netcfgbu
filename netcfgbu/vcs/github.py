@@ -4,6 +4,7 @@
 
 from typing import Optional
 import os
+from urllib.parse import urlsplit
 from pathlib import Path
 from datetime import datetime
 
@@ -17,7 +18,7 @@ import pexpect
 # Private Imports
 # -----------------------------------------------------------------------------
 
-from netcfgbu.config_model import AppConfig, GithubSpec
+from netcfgbu.config_model import GithubSpec
 
 git_bin = "git"
 
@@ -32,6 +33,14 @@ class GitRunner(object):
         self.config = config
         self.repo_dir = repo_dir
         self.git_file = repo_dir.joinpath(".git", "config")
+
+        parsed = urlsplit(config.repo)
+        if parsed.scheme == "https":
+            self._mode = "https"
+            self.repo_url = f"https://{self.user}@{parsed.netloc}{parsed.path}"
+        else:
+            self._mode = "ssh"
+            self.repo_url = config.repo
 
     @property
     def repo_exists(self):
@@ -103,91 +112,22 @@ def git_config(ghr: GitRunner):
 
     for cfg_opt, cfg_val in config_opts:
         ghr.run(f"config --local {cfg_opt} {cfg_val}")
-        # output, rc = pexpect.run(
-        #     command=f"{git_bin} config --local {cfg_opt} {cfg_val}",
-        #     withexitstatus=True,
-        #     cwd=ghr.repo_dir,
-        # )
-        #
-        # if rc != 0:
-        #     raise RuntimeError(f"git config {cfg_opt} failed: %s" % output.decode())
 
 
 def git_clone(ghr: GitRunner):
-    config = ghr.config
-
-    repo_url = f"https://{ghr.user}@{config.github}/{config.repo}.git"
-
-    # need to use pexpect to interact with the password prompt so we do not
-    # store the token value as plaintext in the .git/config file.
-    ghr.run(f"clone {repo_url} {str(ghr.repo_dir)}", authreq=True)
-    # output, rc = pexpect.run(
-    #     command=f
-    #     cwd=configs_dir,
-    #     withexitstatus=True,
-    #     timeout=10,
-    #     events={"Password for": token + "\n"},
-    # )
-    #
-    # if rc != 0:
-    #     raise RuntimeError(output.decode())
-
+    ghr.run(f"clone {ghr.repo_url} {str(ghr.repo_dir)}", authreq=True)
     git_config(ghr)
 
 
-# def with_token(cmd, configs_dir, token):
-#     output, rc = pexpect.run(
-#         command=f"{git_bin} {cmd}",
-#         cwd=configs_dir,
-#         withexitstatus=True,
-#         events={"Password for": token + "\n"},
-#     )
-#
-#     if rc != 0:
-#         raise RuntimeError(output.decode())
-#
-#
-# def without_pw(cmd, configs_dir):
-#     output, rc = pexpect.run(
-#         command=f"{git_bin} {cmd}", cwd=configs_dir, withexitstatus=True
-#     )
-#     if rc != 0:
-#         raise RuntimeError(output.decode())
-#
-#     return output.decode()
-
-
 def git_init(ghr: GitRunner):
-    user = ghr.config.username or os.environ["USER"]
-
-    repo_url = f"https://{user}@{ghr.config.github}/{ghr.config.repo}.git"
-
     commands = (
         ("init", False),
-        (f"remote add origin {repo_url}", False),
+        (f"remote add origin {ghr.repo_url}", False),
         ("pull origin master", True),
     )
 
     for cmd, req_auth in commands:
         ghr.run(cmd, req_auth)
-    #     # output, rc = pexpect.run(
-    #     #     command=f"{git_bin} {cmd}", cwd=configs_dir, withexitstatus=True
-    #     # )
-    #     # if rc != 0:
-    #     #     raise RuntimeError(output.decode())
-    #
-    # # need to use pexpect to interact with the password prompt so we do not
-    # # store the token value as plaintext in the .git/config file.
-    #
-    # output, rc = pexpect.run(
-    #     command=f"{git_bin} pull origin master",
-    #     cwd=configs_dir,
-    #     withexitstatus=True,
-    #     events={"Password for": token + "\n"},
-    # )
-    #
-    # if rc != 0:
-    #     raise RuntimeError(output.decode())
 
     git_config(ghr)
 
@@ -199,12 +139,11 @@ def git_init(ghr: GitRunner):
 # -----------------------------------------------------------------------------
 
 
-def vcs_update(app_cfg: AppConfig, tag_name: Optional[str] = None) -> bool:
+def vcs_update(
+    gh_cfg: GithubSpec, repo_dir: Path, tag_name: Optional[str] = None
+) -> bool:
 
-    ghr = git_runner(
-        gh_cfg=app_cfg.vcs["github"],
-        repo_dir=Path(app_cfg.defaults.configs_dir).absolute(),
-    )
+    ghr = git_runner(gh_cfg, repo_dir)
 
     if not tag_name:
         tag_name = tag_name_timestamp()
@@ -227,11 +166,9 @@ def vcs_update(app_cfg: AppConfig, tag_name: Optional[str] = None) -> bool:
     return True
 
 
-def vcs_setup(app_cfg: AppConfig):
+def vcs_prepare(gh_cfg: GithubSpec, repo_dir: Path):
 
-    ghr = git_runner(
-        app_cfg.vcs["github"], Path(app_cfg.defaults.configs_dir).absolute()
-    )
+    ghr = git_runner(gh_cfg, repo_dir)
 
     if ghr.is_repo_empty:
         git_clone(ghr)
@@ -241,5 +178,7 @@ def vcs_setup(app_cfg: AppConfig):
         # the git repo already exists
         return
 
-    # configs_dir exists, is not empty, but not repo, so we need to setup
+    # repo directory exists and is not empty, but the .git/ is missing, so we
+    # need to pull down the github repo to initialize the .git/ directory.
+
     git_init(ghr)
