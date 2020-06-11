@@ -8,7 +8,15 @@ from itertools import chain
 
 from . import consts
 
-__all__ = ["AppConfig", "Credential", "InventorySpec", "OSNameSpec", "LinterSpec"]
+__all__ = [
+    "AppConfig",
+    "Credential",
+    "InventorySpec",
+    "OSNameSpec",
+    "LinterSpec",
+    "VCSSpec",
+    "GithubSpec",
+]
 
 _var_re = re.compile(
     r"\${(?P<bname>[a-z0-9_]+)}" r"|" r"\$(?P<name>[^{][a-z_0-9]+)", flags=re.IGNORECASE
@@ -71,6 +79,28 @@ class Defaults(NoExtraBaseModel, BaseSettings):
     credentials: DefaultCredential
 
 
+class GithubSpec(NoExtraBaseModel):
+    # github: Optional[str]
+    repo: str
+    email: Optional[str]
+    username: Optional[EnvExpand]
+    password: Optional[EnvExpand]
+    token: Optional[EnvSecretStr]
+
+    @validator("repo")
+    def validate_repo(cls, repo):
+        expected = ("https:", "git@")
+        if not repo.startswith(expected):
+            raise RuntimeError(
+                f"Bad repo URL [{repo}]: expected to start with {expected}."
+            )
+        return repo
+
+
+# TODO: only github is supported (for now)
+VCSSpec = GithubSpec
+
+
 class OSNameSpec(NoExtraBaseModel):
     credentials: Optional[List[Credential]]
     pre_get_config: Optional[Union[str, List[str]]]
@@ -110,3 +140,4 @@ class AppConfig(NoExtraBaseModel):
     linters: Optional[Dict[str, LinterSpec]]
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
+    vcs: List[VCSSpec]

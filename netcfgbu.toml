@@ -7,10 +7,9 @@
 
 [[inventory]]
     name = 'netbox'
-    script = """\
-$PROJ_DIR/netcfgbu/netbox/netbox_inventory.py \
-    --exclude-tag no-backup \
-    --output inventory.csv"""
+    script = '''$PROJ_DIR/netcfgbu/netbox/netbox_inventory.py \
+        --exclude-tag no-backup --exclude-tag no-ssh \
+        --output inventory.csv'''
 
 # -----------------------------------------------------------------------------
 #                           Credentials
@@ -28,7 +27,9 @@ $PROJ_DIR/netcfgbu/netbox/netbox_inventory.py \
    ]
 
 # -----------------------------------------------------------------------------
+#
 #                       Network OS Specifications
+#
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
@@ -112,6 +113,20 @@ $PROJ_DIR/netcfgbu/netbox/netbox_inventory.py \
 
 [linters.panos]
     config_ends_at = "[edit]"
+
+# -----------------------------------------------------------------------------
+#
+#                          Version Control System(s)
+#
+# Currently only github systems are supported, but others types may be
+# supported in the future.  If you have more than one vcs repository you can
+# include the `name` field so that you can identify the vcs-repo using the CLI
+# --name option.
+# -----------------------------------------------------------------------------
+
+[[vcs]]
+    repo = "https://github.mlbam.net/jschulman/test-network-configs.git"
+    token = "$GIT_TOKEN"
 
 # -----------------------------------------------------------------------------
 # Logging - follows Python format as described

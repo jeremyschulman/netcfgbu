@@ -21,13 +21,16 @@ def load(app_cfg: AppConfig, limits=None, excludes=None):
         )
 
     iter_recs = CommentedCsvReader(inventory_file.open())
+    field_names = iter_recs.fieldnames
 
     if limits:
-        filter_fn = create_filter(constraints=limits)
+        filter_fn = create_filter(constraints=limits, field_names=field_names)
         iter_recs = filter(filter_fn, iter_recs)
 
     if excludes:
-        filter_fn = create_filter(constraints=excludes, include=False)
+        filter_fn = create_filter(
+            constraints=excludes, field_names=field_names, include=False
+        )
         iter_recs = filter(filter_fn, iter_recs)
 
     return list(iter_recs)

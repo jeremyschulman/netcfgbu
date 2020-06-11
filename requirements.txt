@@ -6,3 +6,4 @@ pydantic~=1.5.1
 tabulate~=0.8.7
 click~=7.1.2
 first~=2.0.2
+pexpect~=4.8.0
