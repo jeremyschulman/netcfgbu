@@ -1,3 +1,19 @@
+"""
+This file contains the Version Control System (VCS) integration
+using Github as the backend.   The following functions are exported
+for use:
+
+   * vcs_prepare:
+      Used to prepare the repo directory for VCS use.
+
+   * vcs_save:
+      Used to save files in the repo directory into VCS and tag the collection
+      with a release tag.
+
+   * vcs_status:
+      Used to show the current target status of file changes.
+
+"""
 # -----------------------------------------------------------------------------
 # System Imports
 # -----------------------------------------------------------------------------
@@ -25,10 +41,87 @@ git_bin = "git"
 
 
 def tag_name_timestamp() -> str:
+    """
+    Create the tag name using the current time with
+    format <year><month#><day#>_<24hr><minute><sec>
+    """
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+# -----------------------------------------------------------------------------
+#
+#                             Github VCS Entrypoints
+#
+# -----------------------------------------------------------------------------
+
+
+def vcs_save(
+    gh_cfg: GithubSpec, repo_dir: Path, tag_name: Optional[str] = None
+) -> bool:
+    logr = get_logger()
+    logr.info(f"VCS update github: {gh_cfg.repo}")
+
+    ghr = git_runner(gh_cfg, repo_dir)
+
+    if not tag_name:
+        tag_name = tag_name_timestamp()
+
+    output = ghr.run("status")
+    if "nothing to commit" in output:
+        logr.info("VCS no changes, skipping")
+        return False
+
+    logr.info(f"VCS saving changes, tag={tag_name}")
+
+    commands = (
+        ("add -A", False),
+        (f"commit -m {tag_name}", False),
+        ("push", True),
+        (f"tag -a {tag_name} -m {tag_name}", False),
+        ("push --tags", True),
+    )
+
+    for cmd, req_auth in commands:
+        ghr.run(cmd, req_auth)
+
+    return True
+
+
+def vcs_prepare(gh_cfg: GithubSpec, repo_dir: Path):
+    logr = get_logger()
+    logr.info(f"VCS prepare github: {gh_cfg.repo}")
+
+    ghr = git_runner(gh_cfg, repo_dir)
+    ghr.git_init()
+    ghr.git_pull()
+
+
+def vcs_status(gh_cfg: GithubSpec, repo_dir: Path):
+    logr = get_logger()
+    logr.info(
+        f"""
+VCS diffs github: {gh_cfg.repo}
+             dir: {str(repo_dir)}
+"""
+    )
+
+    ghr = git_runner(gh_cfg, repo_dir)
+    return ghr.run("status")
+
+
+# -----------------------------------------------------------------------------
+#
+#                      Git Runners to perform commands
+#
+# -----------------------------------------------------------------------------
+
+
 class GitRunner(object):
+    """
+    The GitRunner class is used to peform the specific `git` command
+    operations requested for the VCS use cases.
+    """
+
     def __init__(self, config: GithubSpec, repo_dir):
         self.user = config.username or os.environ["USER"]
         self.config = config
@@ -37,10 +130,8 @@ class GitRunner(object):
 
         parsed = urlsplit(config.repo)
         if parsed.scheme == "https":
-            self._mode = "https"
             self.repo_url = f"https://{self.user}@{parsed.netloc}{parsed.path}"
         else:
-            self._mode = "ssh"
             self.repo_url = config.repo
 
     @property
@@ -48,10 +139,13 @@ class GitRunner(object):
         return self.git_file.exists()
 
     @property
-    def is_repo_empty(self):
+    def is_dir_empty(self):
         return not any(self.repo_dir.iterdir())
 
     def run_noauth(self, cmd: str):
+        """
+        Run the git command that does not require any user authentication
+        """
         output, rc = pexpect.run(
             command=f"{git_bin} {cmd}",
             withexitstatus=True,
@@ -101,6 +195,10 @@ class GitRunner(object):
 
 
 class GitAuthRunner(GitRunner):
+    """
+    Git Runner that is used for either User/Password or Token cases
+    """
+
     PASSWORD_PROMPT = "Password for"
 
     def _get_secret(self):
@@ -127,6 +225,10 @@ class GitTokenRunner(GitAuthRunner):
 
 
 class GitDeployKeyRunner(GitRunner):
+    """
+    Git Runner used with deployment keys without passphrase
+    """
+
     def git_config(self):
         super().git_config()
         ssh_key = str(Path(self.config.deploy_key).absolute())
@@ -136,6 +238,10 @@ class GitDeployKeyRunner(GitRunner):
 
 
 class GitSecuredDeployKeyRunner(GitDeployKeyRunner, GitAuthRunner):
+    """
+    Git Runner used when deployment key has passphrase configured
+    """
+
     PASSWORD_PROMPT = "Enter passphrase for key"
 
     def _get_secret(self):
@@ -143,6 +249,10 @@ class GitSecuredDeployKeyRunner(GitDeployKeyRunner, GitAuthRunner):
 
 
 def git_runner(gh_cfg: GithubSpec, repo_dir: Path) -> GitRunner:
+    """
+    Used to select the Git Runner based on the configuration file
+    settings.
+    """
     if gh_cfg.token:
         return GitTokenRunner(gh_cfg, repo_dir)
 
@@ -153,62 +263,3 @@ def git_runner(gh_cfg: GithubSpec, repo_dir: Path) -> GitRunner:
             return GitSecuredDeployKeyRunner(gh_cfg, repo_dir)
 
     raise RuntimeError("Github config missing authentication settings")
-
-
-# -----------------------------------------------------------------------------
-#
-#                             Github VCS Entrypoints
-#
-# -----------------------------------------------------------------------------
-
-
-def vcs_update(
-    gh_cfg: GithubSpec, repo_dir: Path, tag_name: Optional[str] = None
-) -> bool:
-    logr = get_logger()
-    logr.info(f"VCS update github: {gh_cfg.repo}")
-
-    ghr = git_runner(gh_cfg, repo_dir)
-
-    if not tag_name:
-        tag_name = tag_name_timestamp()
-
-    output = ghr.run("status")
-    if "nothing to commit" in output:
-        logr.info("VCS no changes, skipping")
-        return False
-
-    logr.info(f"VCS saving changes, tag={tag_name}")
-
-    commands = (
-        ("add -A", False),
-        (f"commit -m {tag_name}", False),
-        ("push", True),
-        (f"tag -a {tag_name} -m {tag_name}", False),
-        ("push --tags", True),
-    )
-
-    for cmd, req_auth in commands:
-        ghr.run(cmd, req_auth)
-
-    return True
-
-
-def vcs_prepare(gh_cfg: GithubSpec, repo_dir: Path):
-    logr = get_logger()
-    logr.info(f"VCS prepare github: {gh_cfg.repo}")
-
-    ghr = git_runner(gh_cfg, repo_dir)
-    ghr.git_init()
-    ghr.git_pull()
-
-
-def vcs_status(gh_cfg: GithubSpec, repo_dir: Path):
-    logr = get_logger()
-    logr.info(f"""
-VCS diffs github: {gh_cfg.repo}
-             dir: {str(repo_dir)}
-""")
-
-    ghr = git_runner(gh_cfg, repo_dir)
-    return ghr.run("status")

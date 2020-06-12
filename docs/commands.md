@@ -7,7 +7,7 @@ For any devices that fail during a command, the `netcfgbu` tool will generate a
 file called `failures.csv` You can use this file in future command to retry
 using the `--limit @failures.csv`.  Or you can use this file to exclude these
 devices using `--exlcude @failures.csv`.  For more details see
-[filtering](filtering.md)
+[filtering](usage-filtering.md)
 
 **inventory**<br/>
 The `inventory ls` command is used to list the contents of the current inventory file.  This
@@ -53,3 +53,8 @@ a host value of "myswitch1", then the file "myswitch1.cfg" is created upon
 successful backup.  The backup files are stored in either the current working
 directory, or the directory designated by the `config_dir` value in the
 [configuration file](configuration-file.md#Changing-Storage-Directory)
+
+Example:
+```shell script
+$ netcfgbu backup --exclude @failures.csv
+```

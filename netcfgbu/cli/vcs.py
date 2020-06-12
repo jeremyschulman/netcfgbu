@@ -1,5 +1,4 @@
 import sys
-from pathlib import Path
 
 
 import click
@@ -26,7 +25,7 @@ class VCSCommand(click.Command):
     def invoke(self, ctx):
         try:
             app_cfgs = ctx.obj["app_cfg"] = _config.load(fileio=ctx.params["config"])
-            if not (spec := get_spec_nameorfirst(app_cfgs.vcs, ctx.params["name"])):
+            if not (spec := get_spec_nameorfirst(app_cfgs.github, ctx.params["name"])):
                 cfgfile = ctx.params["config"].name
                 sys.exit(f"No VCS found, check configuration file: {cfgfile}")
 
@@ -59,8 +58,9 @@ def cli_vcs_setup(ctx, **_cli_opts):
 @cli_vcs.command(name="save", cls=VCSCommand)
 @opt_config_file
 @opt_vcs_name
+@click.option("--tag-name", help="tag-release name")
 @click.pass_context
-def cli_vcs_get(ctx, **_cli_opts):
+def cli_vcs_get(ctx, **cli_opts):
     """
     Save changes into VCS repository.
 
@@ -71,7 +71,11 @@ def cli_vcs_get(ctx, **_cli_opts):
     "<year><month><day>_<hour><minute><second>"
     """
     app_cfgs: AppConfig = ctx.obj["app_cfg"]
-    github.vcs_update(ctx.obj["vcs_spec"], repo_dir=app_cfgs.defaults.configs_dir)
+    github.vcs_save(
+        ctx.obj["vcs_spec"],
+        repo_dir=app_cfgs.defaults.configs_dir,
+        tag_name=cli_opts["tag_name"],
+    )
 
 
 @cli_vcs.command(name="status", cls=VCSCommand)

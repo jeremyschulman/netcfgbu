@@ -36,3 +36,6 @@ switch2,nxos,10.1.123.2
 fw1,asa,10.1.123.254,SecOpsAdmin,$SECOPS_PASSWORD
 ``` 
 
+You can add any additional columns, and use those column names for filtering purposes.
+See [Filtering Usage](usage-filtering.md) for additional information.
+

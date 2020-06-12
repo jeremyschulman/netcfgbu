@@ -16,7 +16,6 @@ __all__ = [
     "InventorySpec",
     "OSNameSpec",
     "LinterSpec",
-    "VCSSpec",
     "GithubSpec",
 ]
 
@@ -81,7 +80,7 @@ class Defaults(NoExtraBaseModel, BaseSettings):
     credentials: DefaultCredential
 
     @validator("configs_dir")
-    def _configs_dir(cls, value):
+    def _configs_dir(cls, value):  # noqa
         return Path(value).absolute()
 
 
@@ -96,17 +95,13 @@ class GithubSpec(NoExtraBaseModel):
     deploy_passphrase: Optional[EnvSecretStr]
 
     @validator("repo")
-    def validate_repo(cls, repo):
+    def validate_repo(cls, repo):  # noqa
         expected = ("https:", "git@")
         if not repo.startswith(expected):
             raise RuntimeError(
                 f"Bad repo URL [{repo}]: expected to start with {expected}."
             )
         return repo
-
-
-# TODO: only github is supported (for now)
-VCSSpec = GithubSpec
 
 
 class OSNameSpec(NoExtraBaseModel):
@@ -148,4 +143,4 @@ class AppConfig(NoExtraBaseModel):
     linters: Optional[Dict[str, LinterSpec]]
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
-    vcs: List[VCSSpec]
+    github: Optional[List[GithubSpec]]
