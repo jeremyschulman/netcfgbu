@@ -1,14 +1,14 @@
 import sys
-from pathlib import Path
 
 
 import click
 
+from netcfgbu import config as _config
 from netcfgbu.config_model import AppConfig
 from netcfgbu.vcs import github
+from netcfgbu.logger import stop_aiologging
 
-
-from .root import cli, get_spec_nameorfirst, WithConfigCommand, opt_config_file
+from .root import cli, get_spec_nameorfirst, opt_config_file
 
 opt_vcs_name = click.option("--name", help="vcs name as defined in config file")
 
@@ -21,11 +21,28 @@ def cli_vcs():
     pass
 
 
-@cli_vcs.command(name="prepare", cls=WithConfigCommand)
+class VCSCommand(click.Command):
+    def invoke(self, ctx):
+        try:
+            app_cfgs = ctx.obj["app_cfg"] = _config.load(fileio=ctx.params["config"])
+            if not (spec := get_spec_nameorfirst(app_cfgs.github, ctx.params["name"])):
+                cfgfile = ctx.params["config"].name
+                sys.exit(f"No VCS found, check configuration file: {cfgfile}")
+
+            ctx.obj["vcs_spec"] = spec
+
+        except Exception as exc:
+            ctx.fail(exc.args[0])
+
+        super().invoke(ctx)
+        stop_aiologging()
+
+
+@cli_vcs.command(name="prepare", cls=VCSCommand)
 @opt_config_file
 @opt_vcs_name
 @click.pass_context
-def cli_vcs_setup(ctx, **cli_opts):
+def cli_vcs_setup(ctx, **_cli_opts):
     """
     Prepare your system with the VCS repo.
 
@@ -35,22 +52,17 @@ def cli_vcs_setup(ctx, **cli_opts):
     """
 
     app_cfgs: AppConfig = ctx.obj["app_cfg"]
-
-    if not (spec := get_spec_nameorfirst(app_cfgs.vcs, cli_opts["name"])):
-        cfgfile = ctx.params["config"].name
-        sys.exit(f"No VCS found, check configuration file: {cfgfile}")
-
-    repo_dir = Path(app_cfgs.defaults.configs_dir).absolute()
-    github.vcs_prepare(spec, repo_dir=repo_dir)
+    github.vcs_prepare(ctx.obj["vcs_spec"], repo_dir=app_cfgs.defaults.configs_dir)
 
 
-@cli_vcs.command(name="update", cls=WithConfigCommand)
+@cli_vcs.command(name="save", cls=VCSCommand)
 @opt_config_file
 @opt_vcs_name
+@click.option("--tag-name", help="tag-release name")
 @click.pass_context
 def cli_vcs_get(ctx, **cli_opts):
     """
-    Update the VCS repository with changes to network config files.
+    Save changes into VCS repository.
 
     After you have run the config backup process you will need to push those
     changes into the VCS repository.  This command performs the necesssary
@@ -59,10 +71,24 @@ def cli_vcs_get(ctx, **cli_opts):
     "<year><month><day>_<hour><minute><second>"
     """
     app_cfgs: AppConfig = ctx.obj["app_cfg"]
+    github.vcs_save(
+        ctx.obj["vcs_spec"],
+        repo_dir=app_cfgs.defaults.configs_dir,
+        tag_name=cli_opts["tag_name"],
+    )
 
-    if not (spec := get_spec_nameorfirst(app_cfgs.vcs, cli_opts["name"])):
-        cfgfile = ctx.params["config"].name
-        sys.exit(f"No VCS found, check configuration file: {cfgfile}")
 
-    repo_dir = Path(app_cfgs.defaults.configs_dir).absolute()
-    github.vcs_update(spec, repo_dir=repo_dir)
+@cli_vcs.command(name="status", cls=VCSCommand)
+@opt_config_file
+@opt_vcs_name
+@click.pass_context
+def cli_vcs_status(ctx, **_cli_opts):
+    """
+    Show VCS repository status.
+
+    This command will show the status of the `configs_dir` contents so that you
+    will know what will be changed before you run the `vcs save` command.
+    """
+    app_cfgs: AppConfig = ctx.obj["app_cfg"]
+    output = github.vcs_status(ctx.obj["vcs_spec"], app_cfgs.defaults.configs_dir)
+    print(output)

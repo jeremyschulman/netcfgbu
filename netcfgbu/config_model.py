@@ -2,9 +2,18 @@ import re
 import os
 from typing import Optional, Union, List, Dict
 from os.path import expandvars
-from pydantic import BaseModel, SecretStr, BaseSettings, PositiveInt, Field, validator
-
 from itertools import chain
+from pathlib import Path
+
+from pydantic import (
+    BaseModel,
+    SecretStr,
+    BaseSettings,
+    PositiveInt,
+    Field,
+    validator,
+)
+
 
 from . import consts
 
@@ -14,7 +23,6 @@ __all__ = [
     "InventorySpec",
     "OSNameSpec",
     "LinterSpec",
-    "VCSSpec",
     "GithubSpec",
 ]
 
@@ -78,27 +86,29 @@ class Defaults(NoExtraBaseModel, BaseSettings):
     inventory: Optional[EnvExpand] = Field(..., env="NETCFGBU_INVENTORY")
     credentials: DefaultCredential
 
+    @validator("configs_dir")
+    def _configs_dir(cls, value):  # noqa
+        return Path(value).absolute()
+
 
 class GithubSpec(NoExtraBaseModel):
-    # github: Optional[str]
+    name: Optional[str]
     repo: str
     email: Optional[str]
     username: Optional[EnvExpand]
     password: Optional[EnvExpand]
     token: Optional[EnvSecretStr]
+    deploy_key: Optional[EnvExpand]
+    deploy_passphrase: Optional[EnvSecretStr]
 
     @validator("repo")
-    def validate_repo(cls, repo):
+    def validate_repo(cls, repo):  # noqa
         expected = ("https:", "git@")
         if not repo.startswith(expected):
             raise RuntimeError(
                 f"Bad repo URL [{repo}]: expected to start with {expected}."
             )
         return repo
-
-
-# TODO: only github is supported (for now)
-VCSSpec = GithubSpec
 
 
 class OSNameSpec(NoExtraBaseModel):
@@ -124,7 +134,7 @@ class InventorySpec(NoExtraBaseModel):
     def validate_script(cls, script_exec):  # noqa
         script_bin, *script_vargs = script_exec.split()
         if not os.path.isfile(script_bin):
-            raise FileNotFoundError(script_bin)
+            raise ValueError(f"File not found: {script_bin}")
 
         if not os.access(script_bin, os.X_OK):
             raise ValueError(f"{script_bin} is not executable")
@@ -135,9 +145,17 @@ class InventorySpec(NoExtraBaseModel):
 class AppConfig(NoExtraBaseModel):
     defaults: Defaults
     credentials: Optional[List[Credential]]
+    linters: Optional[Dict[str, LinterSpec]]
     os_name: Optional[Dict[str, OSNameSpec]]
     inventory: Optional[List[InventorySpec]]
-    linters: Optional[Dict[str, LinterSpec]]
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
-    vcs: List[VCSSpec]
+    github: Optional[List[GithubSpec]]
+
+    @validator("os_name")
+    def _linters(cls, v, values):  # noqa
+        for os_name, os_spec in v.items():
+            if os_spec.linter and os_spec.linter not in values["linters"]:
+                raise ValueError(
+                    f'OS spec "{os_name}" using undefined linter "{os_spec.linter}"'
+                )

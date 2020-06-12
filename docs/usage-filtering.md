@@ -42,6 +42,11 @@ If the filter expression begins with an at-symbol (@), then the contents of the 
 are used to filter the inventory.  You can use either CSV files or plain-text files.
 In both cases any line that begins with a hash (#) will be ignored.
 
+Example:
+```shell script
+$ netcfgbu backup --exclude @failures.csv
+```
+
 ### CSV Files
 When using a CSV file, you must ensure the file extension is `.csv` and that the first
 line includes a field-header row with a `host` column. 

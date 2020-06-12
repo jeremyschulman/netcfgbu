@@ -1,16 +1,23 @@
-# netcfgbu Documentation
+# Network Config Backup Documentation
 
 * [Quick Start](QuickStart.md)
 
-* [Configuration](configuration-file.md)
+* Configuration
+  * [General](configuration-file.md)
+  * [OS Specific Backup Options](config-ospec.md)
+  * [Credentials](config-credentials.md)
+  * [Github](config-vcs-github.md)
+  * [SSH Config Options](config-ssh-options.md)
   
 * [Inventory](inventory.md)
   * [File Definition](inventory.md#inventory-file)
-  * [Scripts](configuration-file.md#inventory-scripts)
-  * [Filtering](filtering.md)
-  
-* [Commands](commands.md)
+  * [Integration Scripts](configuration-file.md#inventory-scripts)
 
-* [Custom Connectors](custom-connectors.md)  
+* Command Usages  
+  * [General Commands](commands.md)
+  * [Filtering](usage-filtering.md)
+  * [Gitub Commands](usage-vcs.md)
 
 * [Environment Variables](environment_variables.md)
+
+* [OS Custom Connectors](custom-connectors.md)  

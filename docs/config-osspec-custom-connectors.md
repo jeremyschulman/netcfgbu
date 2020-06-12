@@ -1,13 +1,14 @@
-# Custom SSH Connectors
+# Custom Connections
+You may encounter network devices that require additional steps beyond the
+standard login process.  For example, the Cisco WLC Aireos v8.5 requires the
+Username and Password values to be provided, even after the SSH connection was
+established using the same credentials.
 
-You may encounter network devices that require additional steps beyond the standard login
-process.  For example, the Cisco WLC product requires the Username and Password values to be
-provided, even after the SSH connection was established using the same credentials.
-
-In such cases the goal of `netcfgbu` is to provide the necessary SSH connector, but in such
-a way that it is not specifically tied to a network vendor or OS.  For example there may be
-other network devices that behave the same way as the WLC, and you could use the same connector
-for the WLC and this other device type.
+In such cases the goal of `netcfgbu` is to provide the necessary SSH connector,
+but in such a way that it is not specifically tied to a network vendor or OS. 
+For example there may be other network devices that behave the same way as the
+WLC, and you could use the same connector for the WLC and this other device
+type.
 
 To use a custom connector type you can add the `connection` value in
 the OS section of your [configuration file](configuration-file.md).  

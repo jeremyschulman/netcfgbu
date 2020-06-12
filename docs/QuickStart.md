@@ -4,8 +4,15 @@ If you are a Netbox user you can dynamically build the inventory.csv file as
 described [here](../netbox/README.md).
 
 You can use the provided configuration file [netcfgbu.toml](../netcfgbu.toml) as
-a starting point and customize it as necessary.  See [Configuration](configuration-file.md)
+a starting point and customize it as necessary.  See [Configurations](TOC.md)
 for details.
+
+If you are storing your configuration backups in Github, refer to the [Github
+Configuration](config-vcs-github.md) and [Github Usage](usage-vcs.md) sections.
+
+
+---
+
 
 If you want to run a probe test to verify SSH access to all your devices
 you can run:
@@ -47,6 +54,10 @@ switch01           iosxe      ConnectionLost: Connection lost
 
 Any errors will be logged to a file called `failures.csv`, which you can then
 use to exclude on future commands.
+
+
+---
+
 
 When you want to run a backup of your configs you can run:
 

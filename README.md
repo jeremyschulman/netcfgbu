@@ -25,14 +25,17 @@ variables.
 * I will have a large number of devices (>1000) so I want this tool to take
 advantage of any and all techniques that reduce the total amount of time.
 
+---
+
 
 The general approach to `netcfgbu` is a configuration based methodology so as
 to not hardcode the tool to work with specific network device drivers
 and avoid the complexity and dependency of including a collection of 3rd-party
 libraries specific to network devices.  
 
-See [example netcfgbu.toml configuration](netcfgbu.toml).<br/>
-Read the document [here](docs/TOC.md).
+Read the Documenttion [here](docs/TOC.md).<br/>
+Read the Quick Start [here](docs/QuickStart.md)<br/>
+[Example netcfgbu.toml configuration](netcfgbu.toml)<br/>
 
 # Introduction
 

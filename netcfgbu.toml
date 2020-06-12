@@ -1,9 +1,51 @@
+# -----------------------------------------------------------------------------
+#
+#                          Network Configuration Backup
+#                              Configuration File
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+#                              Default Settings
+# -----------------------------------------------------------------------------
+
 [defaults]
     inventory = "$PROJ_DIR/inventory.csv"
     configs_dir = "$PROJ_DIR/configs"
     credentials.username = "$NETWORK_USERNAME"
     credentials.password = "$NETWORK_PASSWORD"
 
+# -----------------------------------------------------------------------------
+#
+#                          Version Control System(s)
+#
+# Currently only github systems are supported, but others types may be
+# supported in the future.  If you have more than one vcs repository you can
+# include the `name` field so that you can identify the vcs-repo using the CLI
+# --name option.
+# -----------------------------------------------------------------------------
+
+[[github]]
+    # the first entry does not require a name and it will be treated
+    # as a default; i.e. when the --name option is omitted.
+    repo = "https://github.mycorp.com/jschulman/test-network-configs.git"
+    token = "$GIT_TOKEN"
+
+[[github]]
+    # example of using a deployment key that does not use a passphrase
+    name = "ssh"
+    repo = "git@github.mycorp.com:jschulman/test-network-configs.git"
+    deploy_key = "$HOME/test-config-backups"
+
+[[github]]
+    # example of using a deployment key that uses a passphrase
+    name = "ssh-pw"
+    repo = "git@github.mlbam.net:jschulman/test-network-configs.git"
+    deploy_key = "$HOME/pwtest-backups"
+    deploy_passphrase = "$GITKEY_PASSWORD"
+
+# -----------------------------------------------------------------------------
+#                           Inventory Integrations
+# -----------------------------------------------------------------------------
 
 [[inventory]]
     name = 'netbox'
@@ -12,12 +54,16 @@
         --output inventory.csv'''
 
 # -----------------------------------------------------------------------------
-#                           Credentials
+#                           Global Credentials
 # -----------------------------------------------------------------------------
 
 #[[credentials]]
 #   username = "superadmin"
 #   password = "$ENABLE_PASSWORD"
+
+# -----------------------------------------------------------------------------
+#                           Global SSH Configs
+# -----------------------------------------------------------------------------
 
 [ssh_configs]
    kex_algs = [
@@ -125,7 +171,7 @@
 # -----------------------------------------------------------------------------
 
 [[vcs]]
-    repo = "https://github.mlbam.net/jschulman/test-network-configs.git"
+    repo = "https://github.mycorp.com/jschulman/test-network-configs.git"
     token = "$GIT_TOKEN"
 
 # -----------------------------------------------------------------------------
