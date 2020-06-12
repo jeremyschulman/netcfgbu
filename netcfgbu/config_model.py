@@ -5,7 +5,15 @@ from os.path import expandvars
 from itertools import chain
 from pathlib import Path
 
-from pydantic import BaseModel, SecretStr, BaseSettings, PositiveInt, Field, validator
+from pydantic import (
+    BaseModel,
+    SecretStr,
+    BaseSettings,
+    PositiveInt,
+    Field,
+    validator,
+    root_validator,
+)
 
 
 from . import consts
@@ -127,7 +135,7 @@ class InventorySpec(NoExtraBaseModel):
     def validate_script(cls, script_exec):  # noqa
         script_bin, *script_vargs = script_exec.split()
         if not os.path.isfile(script_bin):
-            raise FileNotFoundError(script_bin)
+            raise ValueError(f"File not found: {script_bin}")
 
         if not os.access(script_bin, os.X_OK):
             raise ValueError(f"{script_bin} is not executable")
@@ -138,9 +146,17 @@ class InventorySpec(NoExtraBaseModel):
 class AppConfig(NoExtraBaseModel):
     defaults: Defaults
     credentials: Optional[List[Credential]]
+    linters: Optional[Dict[str, LinterSpec]]
     os_name: Optional[Dict[str, OSNameSpec]]
     inventory: Optional[List[InventorySpec]]
-    linters: Optional[Dict[str, LinterSpec]]
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
     github: Optional[List[GithubSpec]]
+
+    @validator("os_name")
+    def _linters(cls, v, values):  # noqa
+        for os_name, os_spec in v.items():
+            if os_spec.linter and os_spec.linter not in values["linters"]:
+                raise ValueError(
+                    f'OS spec "{os_name}" using undefined linter "{os_spec.linter}"'
+                )
