@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.8
 #
 # This script is used to retrieve the device inventory from a Netbox system and
 # emil the CSV file to either stdout (default) or a filename provided
