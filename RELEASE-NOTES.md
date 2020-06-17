@@ -1,5 +1,8 @@
 # Release Notes
 
+#### v0.3.1 (2020-Jun-17)
+   * Bugfix resulting in missing `os_name` config
+   
 #### v0.3.0 (2020-Jun-12)
    * Add support for Github version control system
    * Add config file validation
