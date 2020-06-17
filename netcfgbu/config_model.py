@@ -159,3 +159,4 @@ class AppConfig(NoExtraBaseModel):
                 raise ValueError(
                     f'OS spec "{os_name}" using undefined linter "{os_spec.linter}"'
                 )
+        return v

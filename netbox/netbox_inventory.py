@@ -121,6 +121,7 @@ def fetch_inventory(cli_opts):
     res = netbox.get("/api")
     api_ver = tuple(map(int, res.headers["API-Version"].split(".")))
     params = dict(limit=0, status=1, has_primary_ip="true")
+    params["exclude"] = "config_context"
 
     if api_ver > (2, 6):
         params["status"] = "active"
