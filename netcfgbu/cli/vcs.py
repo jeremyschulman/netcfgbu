@@ -5,7 +5,7 @@ import click
 
 from netcfgbu import config as _config
 from netcfgbu.config_model import AppConfig
-from netcfgbu.vcs import github
+from netcfgbu.vcs import git
 from netcfgbu.logger import stop_aiologging
 
 from .root import cli, get_spec_nameorfirst, opt_config_file
@@ -25,7 +25,7 @@ class VCSCommand(click.Command):
     def invoke(self, ctx):
         try:
             app_cfgs = ctx.obj["app_cfg"] = _config.load(fileio=ctx.params["config"])
-            if not (spec := get_spec_nameorfirst(app_cfgs.github, ctx.params["name"])):
+            if not (spec := get_spec_nameorfirst(app_cfgs.git, ctx.params["name"])):
                 cfgfile = ctx.params["config"].name
                 sys.exit(f"No VCS found, check configuration file: {cfgfile}")
 
@@ -52,7 +52,7 @@ def cli_vcs_setup(ctx, **_cli_opts):
     """
 
     app_cfgs: AppConfig = ctx.obj["app_cfg"]
-    github.vcs_prepare(ctx.obj["vcs_spec"], repo_dir=app_cfgs.defaults.configs_dir)
+    git.vcs_prepare(ctx.obj["vcs_spec"], repo_dir=app_cfgs.defaults.configs_dir)
 
 
 @cli_vcs.command(name="save", cls=VCSCommand)
@@ -71,7 +71,7 @@ def cli_vcs_get(ctx, **cli_opts):
     "<year><month><day>_<hour><minute><second>"
     """
     app_cfgs: AppConfig = ctx.obj["app_cfg"]
-    github.vcs_save(
+    git.vcs_save(
         ctx.obj["vcs_spec"],
         repo_dir=app_cfgs.defaults.configs_dir,
         tag_name=cli_opts["tag_name"],
@@ -90,5 +90,5 @@ def cli_vcs_status(ctx, **_cli_opts):
     will know what will be changed before you run the `vcs save` command.
     """
     app_cfgs: AppConfig = ctx.obj["app_cfg"]
-    output = github.vcs_status(ctx.obj["vcs_spec"], app_cfgs.defaults.configs_dir)
+    output = git.vcs_status(ctx.obj["vcs_spec"], app_cfgs.defaults.configs_dir)
     print(output)

@@ -18,25 +18,25 @@
 #
 #                          Version Control System(s)
 #
-# Currently only github systems are supported, but others types may be
+# Currently only git systems are supported, but others types may be
 # supported in the future.  If you have more than one vcs repository you can
 # include the `name` field so that you can identify the vcs-repo using the CLI
 # --name option.
 # -----------------------------------------------------------------------------
 
-[[github]]
+[[git]]
     # the first entry does not require a name and it will be treated
     # as a default; i.e. when the --name option is omitted.
     repo = "https://github.mycorp.com/jschulman/test-network-configs.git"
     token = "$GIT_TOKEN"
 
-[[github]]
+[[git]]
     # example of using a deployment key that does not use a passphrase
     name = "ssh"
-    repo = "git@github.mycorp.com:jschulman/test-network-configs.git"
+    repo = "git@gitlab.com:jschulman/test-network-configs.git"
     deploy_key = "$HOME/test-config-backups"
 
-[[github]]
+[[git]]
     # example of using a deployment key that uses a passphrase
     name = "ssh-pw"
     repo = "git@github.mlbam.net:jschulman/test-network-configs.git"

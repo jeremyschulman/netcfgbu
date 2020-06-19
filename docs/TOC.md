@@ -6,7 +6,7 @@
   * [General](configuration-file.md)
   * [OS Specific Backup Options](config-ospec.md)
   * [Credentials](config-credentials.md)
-  * [Github](config-vcs-github.md)
+  * [Git](config-vcs-git.md)
   * [SSH Config Options](config-ssh-options.md)
   
 * [Inventory](inventory.md)

@@ -7,8 +7,8 @@ You can use the provided configuration file [netcfgbu.toml](../netcfgbu.toml) as
 a starting point and customize it as necessary.  See [Configurations](TOC.md)
 for details.
 
-If you are storing your configuration backups in Github, refer to the [Github
-Configuration](config-vcs-github.md) and [Github Usage](usage-vcs.md) sections.
+If you are storing your configuration backups in a Git Version Control System, refer to the [Git
+Configuration](config-vcs-git.md) and [Git Usage](usage-vcs.md) sections.
 
 
 ---

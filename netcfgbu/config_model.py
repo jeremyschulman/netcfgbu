@@ -23,7 +23,7 @@ __all__ = [
     "InventorySpec",
     "OSNameSpec",
     "LinterSpec",
-    "GithubSpec",
+    "GitSpec",
 ]
 
 _var_re = re.compile(
@@ -91,7 +91,7 @@ class Defaults(NoExtraBaseModel, BaseSettings):
         return Path(value).absolute()
 
 
-class GithubSpec(NoExtraBaseModel):
+class GitSpec(NoExtraBaseModel):
     name: Optional[str]
     repo: str
     email: Optional[str]
@@ -150,7 +150,7 @@ class AppConfig(NoExtraBaseModel):
     inventory: Optional[List[InventorySpec]]
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
-    github: Optional[List[GithubSpec]]
+    git: Optional[List[GitSpec]]
 
     @validator("os_name")
     def _linters(cls, v, values):  # noqa
