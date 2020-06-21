@@ -1,0 +1,206 @@
+# -----------------------------------------------------------------------------
+#
+#                          Network Configuration Backup
+#                              Configuration File
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+#                              Default Settings
+# -----------------------------------------------------------------------------
+
+[defaults]
+    inventory = "$PROJ_DIR/inventory.csv"
+    configs_dir = "$PROJ_DIR/configs"
+    credentials.username = "$NETWORK_USERNAME"
+    credentials.password = "$NETWORK_PASSWORD"
+
+# -----------------------------------------------------------------------------
+#
+#                          Version Control System(s)
+#
+# Currently only git systems are supported, but others types may be
+# supported in the future.  If you have more than one vcs repository you can
+# include the `name` field so that you can identify the vcs-repo using the CLI
+# --name option.
+# -----------------------------------------------------------------------------
+
+[[git]]
+    # the first entry does not require a name and it will be treated
+    # as a default; i.e. when the --name option is omitted.
+    repo = "https://github.mycorp.com/jschulman/test-network-configs.git"
+    token = "$GIT_TOKEN"
+
+[[git]]
+    # example of using a deployment key that does not use a passphrase
+    name = "ssh"
+    repo = "git@gitlab.com:jschulman/test-network-configs.git"
+    deploy_key = "$HOME/test-config-backups"
+
+[[git]]
+    # example of using a deployment key that uses a passphrase
+    name = "ssh-pw"
+    repo = "git@github.mlbam.net:jschulman/test-network-configs.git"
+    deploy_key = "$HOME/pwtest-backups"
+    deploy_passphrase = "$GITKEY_PASSWORD"
+
+# -----------------------------------------------------------------------------
+#                           Inventory Integrations
+# -----------------------------------------------------------------------------
+
+[[inventory]]
+    name = 'netbox'
+    script = '''$PROJ_DIR/netcfgbu/netbox/netbox_inventory.py \
+        --exclude-tag no-backup --exclude-tag no-ssh \
+        --output inventory.csv'''
+
+# -----------------------------------------------------------------------------
+#                           Global Credentials
+# -----------------------------------------------------------------------------
+
+#[[credentials]]
+#   username = "superadmin"
+#   password = "$ENABLE_PASSWORD"
+
+# -----------------------------------------------------------------------------
+#                           Global SSH Configs
+# -----------------------------------------------------------------------------
+
+[ssh_configs]
+   kex_algs = [
+        'ecdh-sha2-nistp256',
+        'diffie-hellman-group14-sha1',
+        'diffie-hellman-group1-sha1'
+   ]
+
+# -----------------------------------------------------------------------------
+#
+#                       Network OS Specifications
+#
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Cisco switchs, routers, and firewalls
+# -----------------------------------------------------------------------------
+
+[os_name.ios]
+    pre_get_config = "terminal length 0"
+    linter = "ios"
+
+[os_name.iosxe]
+    linter = 'ios'
+
+[os_name.nxos]
+    get_config = 'show running-config | no-more'
+    linter = "nxos"
+
+[os_name.iosxr]
+    linter = "iosxr"
+
+[os_name.asa]
+    pre_get_config = 'terminal pager 0'
+
+# -----------------------------------------------------------------------------
+# Cisco WLC
+# -----------------------------------------------------------------------------
+
+[os_name.aireos]
+    # support for 8.5 release requires a special connector to handle the User &
+    # Password prompts
+
+    get_config = "show run-config commands"
+    pre_get_config = "config paging disable"
+    connection = "netcfgbu.connectors.ssh.LoginPromptUserPass"
+
+[os_name.aireos8_10]
+    # extending the timeout to 3min due to observations with the 8.10 release
+    # resulting in sporatic delays in the output of the config.
+
+    timeout = 300
+
+    get_config = "show run-config commands"
+    pre_get_config = "config paging disable"
+
+    # need to explicitly set the Key Exchange algorithms to support the 8.10
+    # SSH configured requirements; can be set here or in your ssh_config file.
+
+#    ssh_configs.kex_algs = [
+#        'ecdh-sha2-nistp256',
+#        'diffie-hellman-group14-sha1'
+#    ]
+
+    [[os_name.aireos8_10.credentials]]
+        username = "$WLC_USERNAME"
+        password = "$WLC_PASSWORD"
+
+# -----------------------------------------------------------------------------
+# Palo Alto PANOS Firewalls
+# -----------------------------------------------------------------------------
+
+[os_name.panos]
+    pre_get_config = [
+        "set cli pager off",
+        "configure"
+    ]
+    get_config = "show"
+    linter = "panos"
+
+# -----------------------------------------------------------------------------
+#                                 Linters
+# -----------------------------------------------------------------------------
+
+[linters.iosxr]
+    config_starts_after = 'Building configuration'
+
+[linters.ios]
+    config_starts_after = 'Current configuration'
+
+[linters.nxos]
+    config_starts_after = '!Time:'
+
+[linters.panos]
+    config_ends_at = "[edit]"
+
+# -----------------------------------------------------------------------------
+#
+#                          Version Control System(s)
+#
+# Currently only github systems are supported, but others types may be
+# supported in the future.  If you have more than one vcs repository you can
+# include the `name` field so that you can identify the vcs-repo using the CLI
+# --name option.
+# -----------------------------------------------------------------------------
+
+[[vcs]]
+    repo = "https://github.mycorp.com/jschulman/test-network-configs.git"
+    token = "$GIT_TOKEN"
+
+# -----------------------------------------------------------------------------
+# Logging - follows Python format as described
+#   https://docs.python.org/3/library/logging.config.html
+# -----------------------------------------------------------------------------
+
+
+[logging.loggers.netcfgbu]
+    handlers = ["console", "file"]
+    level = "INFO"
+
+[logging.loggers.asyncssh]
+    # set the level to warning by default.  If you want to enable debugging
+    # use the '--debug-ssh' option to set the debug level from [1-3];
+    # https://asyncssh.readthedocs.io/en/latest/api.html#asyncssh.set_debug_level
+
+    handlers = ["console"]
+    level = "WARNING"
+
+[logging.handlers.console]
+    class = "logging.StreamHandler"
+    formatter = "basic"
+    stream = "ext://sys.stdout"
+
+[logging.handlers.file]
+    class = "logging.FileHandler"
+    formatter = "basic"
+    filename =  "netcfgbu.log"
+
+[logging.formatters.basic]
+    format = "%(asctime)s %(levelname)s: %(message)s"

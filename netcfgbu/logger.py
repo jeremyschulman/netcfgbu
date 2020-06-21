@@ -66,11 +66,9 @@ def setup_logging(app_cfg):
     log_cfg = app_cfg.get("logging") or {}
     log_cfg["version"] = 1
 
-    # if 'asyncssh' in log_cfg.get('loggers'):
-    #     assh_lcfg = log_cfg['loggers']['asyncssh']
-
     dictConfig(log_cfg)
-    setup_logging_queue(log_cfg["loggers"])
+    if "loggers" in log_cfg:
+        setup_logging_queue(log_cfg["loggers"])
 
 
 def stop_aiologging():

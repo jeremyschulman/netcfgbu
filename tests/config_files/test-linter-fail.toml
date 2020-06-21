@@ -1,0 +1,5 @@
+[os_name.ios]
+    pre_get_config = "terminal length 0"
+    linter = "ios"
+
+# missing linter causes failure

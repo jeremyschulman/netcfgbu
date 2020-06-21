@@ -33,7 +33,7 @@ def cli_inventory():
     pass
 
 
-@cli_inventory.command("ls", cls=WithInventoryCommand)
+@cli_inventory.command("list", cls=WithInventoryCommand)
 @opt_config_file
 @opts_inventory
 @click.option("--brief", "-b", is_flag=True)

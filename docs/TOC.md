@@ -18,6 +18,8 @@
   * [Filtering](usage-filtering.md)
   * [Gitub Commands](usage-vcs.md)
 
+* [Troubleshooting](troubleshooting.md)
+
 * [Environment Variables](environment_variables.md)
 
 * [OS Custom Connectors](custom-connectors.md)  

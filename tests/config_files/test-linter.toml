@@ -1,0 +1,6 @@
+[os_name.ios]
+    pre_get_config = "terminal length 0"
+    linter = "ios"
+
+[linters.ios]
+    config_starts_after = 'Current configuration'
