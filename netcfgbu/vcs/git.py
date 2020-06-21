@@ -1,6 +1,6 @@
 """
 This file contains the Version Control System (VCS) integration
-using Github as the backend.   The following functions are exported
+using Git as the backend.   The following functions are exported
 for use:
 
    * vcs_prepare:
@@ -35,7 +35,7 @@ import pexpect
 # -----------------------------------------------------------------------------
 
 from netcfgbu.logger import get_logger
-from netcfgbu.config_model import GithubSpec
+from netcfgbu.config_model import GitSpec
 
 git_bin = "git"
 
@@ -50,16 +50,14 @@ def tag_name_timestamp() -> str:
 
 # -----------------------------------------------------------------------------
 #
-#                             Github VCS Entrypoints
+#                             Git VCS Entrypoints
 #
 # -----------------------------------------------------------------------------
 
 
-def vcs_save(
-    gh_cfg: GithubSpec, repo_dir: Path, tag_name: Optional[str] = None
-) -> bool:
+def vcs_save(gh_cfg: GitSpec, repo_dir: Path, tag_name: Optional[str] = None) -> bool:
     logr = get_logger()
-    logr.info(f"VCS update github: {gh_cfg.repo}")
+    logr.info(f"VCS update git: {gh_cfg.repo}")
 
     ghr = git_runner(gh_cfg, repo_dir)
 
@@ -87,20 +85,20 @@ def vcs_save(
     return True
 
 
-def vcs_prepare(gh_cfg: GithubSpec, repo_dir: Path):
+def vcs_prepare(gh_cfg: GitSpec, repo_dir: Path):
     logr = get_logger()
-    logr.info(f"VCS prepare github: {gh_cfg.repo}")
+    logr.info(f"VCS prepare git: {gh_cfg.repo}")
 
     ghr = git_runner(gh_cfg, repo_dir)
     ghr.git_init()
     ghr.git_pull()
 
 
-def vcs_status(gh_cfg: GithubSpec, repo_dir: Path):
+def vcs_status(gh_cfg: GitSpec, repo_dir: Path):
     logr = get_logger()
     logr.info(
         f"""
-VCS diffs github: {gh_cfg.repo}
+VCS diffs git: {gh_cfg.repo}
              dir: {str(repo_dir)}
 """
     )
@@ -122,7 +120,7 @@ class GitRunner(object):
     operations requested for the VCS use cases.
     """
 
-    def __init__(self, config: GithubSpec, repo_dir):
+    def __init__(self, config: GitSpec, repo_dir):
         self.user = config.username or os.environ["USER"]
         self.config = config
         self.repo_dir = repo_dir
@@ -248,7 +246,7 @@ class GitSecuredDeployKeyRunner(GitDeployKeyRunner, GitAuthRunner):
         return self.config.deploy_passphrase.get_secret_value()
 
 
-def git_runner(gh_cfg: GithubSpec, repo_dir: Path) -> GitRunner:
+def git_runner(gh_cfg: GitSpec, repo_dir: Path) -> GitRunner:
     """
     Used to select the Git Runner based on the configuration file
     settings.
@@ -262,4 +260,4 @@ def git_runner(gh_cfg: GithubSpec, repo_dir: Path) -> GitRunner:
         else:
             return GitSecuredDeployKeyRunner(gh_cfg, repo_dir)
 
-    raise RuntimeError("Github config missing authentication settings")
+    raise RuntimeError("Git config missing authentication settings")

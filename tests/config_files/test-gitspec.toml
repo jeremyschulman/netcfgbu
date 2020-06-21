@@ -1,0 +1,18 @@
+[[git]]
+    # the first entry does not require a name and it will be treated
+    # as a default; i.e. when the --name option is omitted.
+    repo = "https://github.mycorp.com/jschulman/test-network-configs.git"
+    token = "$GIT_TOKEN"
+
+[[git]]
+    # example of using a deployment key that does not use a passphrase
+    name = "ssh"
+    repo = "git@gitlab.com:jschulman/test-network-configs.git"
+    deploy_key = "$HOME/test-config-backups"
+
+[[git]]
+    # example of using a deployment key that uses a passphrase
+    name = "ssh-pw"
+    repo = "git@github.mlbam.net:jschulman/test-network-configs.git"
+    deploy_key = "$HOME/pwtest-backups"
+    deploy_passphrase = "$GITKEY_PASSWORD"

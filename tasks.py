@@ -14,7 +14,8 @@ from invoke import task
 PYTHON_PATHS = [
     'netcfgbu/',
     'bin/netcfgbu',
-    'netbox/*.py'
+    'netbox/*.py',
+    'tests/*.py'
 ]
 
 
@@ -23,3 +24,12 @@ def lint(ctx):
     for each in PYTHON_PATHS:
         ctx.run(f"black {each}")
         ctx.run(f"flake8 {each}")
+
+
+@task
+def clean(ctx):
+    ctx.run("python setup.py clean")
+    ctx.run("rm -rf netcfgbu.egg-info")
+    ctx.run("rm -rf .pytest_cache .pytest_tmpdir")
+    ctx.run("rm -rf htmlcov")
+

@@ -9,68 +9,13 @@
 # -----------------------------------------------------------------------------
 
 [defaults]
-    inventory = "$PROJ_DIR/inventory.csv"
-    configs_dir = "$PROJ_DIR/configs"
-    credentials.username = "$NETWORK_USERNAME"
-    credentials.password = "$NETWORK_PASSWORD"
+    inventory = "/tmp/inventory.csv"
+    configs_dir = "/tmp/configs"
+    credentials.username = "my-user-login-name"
+    credentials.password = "my-user-login-password"
 
-# -----------------------------------------------------------------------------
-#
-#                          Version Control System(s)
-#
-# Currently only git systems are supported, but others types may be
-# supported in the future.  If you have more than one vcs repository you can
-# include the `name` field so that you can identify the vcs-repo using the CLI
-# --name option.
-# -----------------------------------------------------------------------------
 
-[[git]]
-    # the first entry does not require a name and it will be treated
-    # as a default; i.e. when the --name option is omitted.
-    repo = "https://github.mycorp.com/jschulman/test-network-configs.git"
-    token = "$GIT_TOKEN"
 
-[[git]]
-    # example of using a deployment key that does not use a passphrase
-    name = "ssh"
-    repo = "git@gitlab.com:jschulman/test-network-configs.git"
-    deploy_key = "$HOME/test-config-backups"
-
-[[git]]
-    # example of using a deployment key that uses a passphrase
-    name = "ssh-pw"
-    repo = "git@github.mlbam.net:jschulman/test-network-configs.git"
-    deploy_key = "$HOME/pwtest-backups"
-    deploy_passphrase = "$GITKEY_PASSWORD"
-
-# -----------------------------------------------------------------------------
-#                           Inventory Integrations
-# -----------------------------------------------------------------------------
-
-[[inventory]]
-    name = 'netbox'
-    script = '''$PROJ_DIR/netcfgbu/netbox/netbox_inventory.py \
-        --exclude-tag no-backup --exclude-tag no-ssh \
-        --output inventory.csv'''
-
-# -----------------------------------------------------------------------------
-#                           Global Credentials
-# -----------------------------------------------------------------------------
-
-#[[credentials]]
-#   username = "superadmin"
-#   password = "$ENABLE_PASSWORD"
-
-# -----------------------------------------------------------------------------
-#                           Global SSH Configs
-# -----------------------------------------------------------------------------
-
-[ssh_configs]
-   kex_algs = [
-        'ecdh-sha2-nistp256',
-        'diffie-hellman-group14-sha1',
-        'diffie-hellman-group1-sha1'
-   ]
 
 # -----------------------------------------------------------------------------
 #

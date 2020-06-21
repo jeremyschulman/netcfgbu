@@ -23,7 +23,7 @@ __all__ = [
     "InventorySpec",
     "OSNameSpec",
     "LinterSpec",
-    "GithubSpec",
+    "GitSpec",
 ]
 
 _var_re = re.compile(
@@ -58,8 +58,12 @@ class EnvExpand(str):
     def validate(cls, v):
         if found_vars := list(filter(len, chain.from_iterable(_var_re.findall(v)))):
             for var in found_vars:
-                if not os.getenv(var):
+                if (var_val := os.getenv(var)) is None:
                     raise ValueError(f'Environment variable "{var}" missing.')
+
+                if not len(var_val):
+                    raise ValueError(f'Environment variable "{var}" empty.')
+
             return expandvars(v)
 
         return v
@@ -76,22 +80,28 @@ class Credential(NoExtraBaseModel):
     password: EnvSecretStr
 
 
-class DefaultCredential(NoExtraBaseModel, BaseSettings):
+class DefaultCredential(Credential, BaseSettings):
     username: EnvExpand = Field(..., env="NETCFGBU_DEFAULT_USERNAME")
     password: EnvSecretStr = Field(..., env="NETCFGBU_DEFAULT_PASSWORD")
 
 
 class Defaults(NoExtraBaseModel, BaseSettings):
     configs_dir: Optional[EnvExpand] = Field(..., env=("NETCFGBU_CONFIGSDIR", "PWD"))
-    inventory: Optional[EnvExpand] = Field(..., env="NETCFGBU_INVENTORY")
+    inventory: EnvExpand = Field(..., env="NETCFGBU_INVENTORY")
     credentials: DefaultCredential
+
+    @validator("inventory")
+    def _inventory_provided(cls, value):  # noqa
+        if not len(value):
+            raise ValueError("inventory empty value not allowed")
+        return value
 
     @validator("configs_dir")
     def _configs_dir(cls, value):  # noqa
         return Path(value).absolute()
 
 
-class GithubSpec(NoExtraBaseModel):
+class GitSpec(NoExtraBaseModel):
     name: Optional[str]
     repo: str
     email: Optional[str]
@@ -105,7 +115,7 @@ class GithubSpec(NoExtraBaseModel):
     def validate_repo(cls, repo):  # noqa
         expected = ("https:", "git@")
         if not repo.startswith(expected):
-            raise RuntimeError(
+            raise ValueError(
                 f"Bad repo URL [{repo}]: expected to start with {expected}."
             )
         return repo
@@ -150,12 +160,13 @@ class AppConfig(NoExtraBaseModel):
     inventory: Optional[List[InventorySpec]]
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
-    github: Optional[List[GithubSpec]]
+    git: Optional[List[GitSpec]]
 
     @validator("os_name")
     def _linters(cls, v, values):  # noqa
+        linters = values.get('linters') or {}
         for os_name, os_spec in v.items():
-            if os_spec.linter and os_spec.linter not in values["linters"]:
+            if os_spec.linter and os_spec.linter not in linters:
                 raise ValueError(
                     f'OS spec "{os_name}" using undefined linter "{os_spec.linter}"'
                 )

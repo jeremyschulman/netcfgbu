@@ -47,7 +47,7 @@ def exec_probe(inventory, timeout=None):
                 probe_ok = False
                 report.task_results[False].append((rec, exc))
 
-            log.info(f"{rec['host']}: {'PASS' if probe_ok else 'FAIL'}")
+            log.info(f"{rec['host']}: probe {'PASS' if probe_ok else 'FAIL'}")
 
     report.start_timing()
     loop.run_until_complete(proces_check())

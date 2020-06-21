@@ -1,0 +1,4 @@
+[[git]]
+    name = "ssh"
+    repo = "gibberish@gitlab.com:jschulman/test-network-configs.git"
+    deploy_key = "$HOME/test-config-backups"
