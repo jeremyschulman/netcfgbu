@@ -1,8 +1,10 @@
 # Release Notes
 
-#### v0.4.0 (2020-Jun-19)
+#### v0.4.0 (2020-Jun-21)
    * BREAKING Change `[[github]]` to `[[git]]` in `netcfgby.toml`
-   * BREAKING Change subcommand "inventory ls" -> "inventory list"
+   * BREAKING Change subcommand `inventory ls` to `inventory list`
+   * Added unit-test coverage for configuration file use-cases
+   * Added Troubleshooting documentation
 
 #### v0.3.1 (2020-Jun-17)
    * Bugfix resulting in missing `os_name` config
