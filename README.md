@@ -9,6 +9,12 @@ As a network engineer I need to backup my network configuration files into a
 version control system, and I need a tool to automate this process.  My primary
 means of accessing the devices is SSH.
 
+**Supported Devices**<br/>
+The `netcfgbu` tool was built specifically to backup network operating system (NOS)
+configurations that are monolithic in nature.  That is to say the entire
+configuration can be captured using a command such as "show running-config".  Any
+NOS that provides a monolithic configuration should be supported by `netcfgbu`.
+
 **Primary Considerations**    
 * I have a multi-vendor environment. I need to account for the different commands
 that are used to obtain the running configuration and disable paging if
@@ -68,9 +74,10 @@ Options:
 
 Commands:
   backup     Backup network configurations.
-  inventory  [ls, build, ...]
+  inventory  Inventory subcommands.
   login      Verify SSH login to devices.
-  probe      Probe device for SSH reachability.
+  probe      Probe device for SSH reachablility.
+  vcs        Version Control System subcommands.
 ```
 
 # Setup

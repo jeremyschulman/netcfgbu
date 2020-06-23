@@ -2,6 +2,8 @@
 
 * [Quick Start](QuickStart.md)
 
+* [Motivation](motivation.md)
+
 * Configuration
   * [General](configuration-file.md)
   * [OS Specific Backup Options](config-ospec.md)

@@ -1,4 +1,10 @@
 # Credentials
+
+The `netcfgbu` tool requires that any credentials you use will have the
+necessary priveledge to execute any of the `pre_get_config` and `get_config`
+commands without having to change the priveldge level.  The `netcfgbu` tool
+does not support the capabilty of changing priveldge levels.
+
 The `netcfgbu` tool will attempt to login to each device using any of the
 following credentials **_in this order_**:
 
