@@ -1,5 +1,4 @@
 import csv
-import re
 
 
 class CommentedCsvReader(csv.DictReader):
@@ -12,27 +11,29 @@ class CommentedCsvReader(csv.DictReader):
         return value
 
 
-class TextFileReader(object):
-    wordsep_re = re.compile(r"\s+|,")
-
-    def __init__(self, fileio):
-        self._lines = fileio.readlines()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        try:
-            line_item = self._lines.pop(0)
-        except IndexError:
-            raise StopIteration
-
-        if line_item.startswith("#"):
-            return self.__next__()
-
-        host = next(iter(self.wordsep_re.split(line_item)), None)
-
-        if host:
-            return host
-
-        return self.__next__()
+# TODO: not in use just yet.
+# class TextFileReader(object):
+#     wordsep_re = re.compile(r"\s+|,")
+#
+#     def __init__(self, fileio, index=0):
+#         self._index = index
+#         self._lines = fileio.readlines()
+#
+#     def __iter__(self):
+#         return self
+#
+#     def __next__(self):
+#         try:
+#             line_item = self._lines.pop(0)
+#         except IndexError:
+#             raise StopIteration
+#
+#         if line_item.startswith("#"):
+#             return self.__next__()
+#
+#         try:
+#             return self.wordsep_re.split(line_item)[self._index]
+#         except IndexError:
+#             pass
+#
+#         return self.__next__()

@@ -73,8 +73,9 @@ maintain specific fields for each device record, for example `hostname` or
 `name` or `os_family` or `platform` or `management_ipaddr`.  A User could
 potentially have multiple "sources of truths" spreadsheets that need to all be
 considered for use.  Regardless of the origin format and field names, the
-`netcfgbu` tool operates using a simple CSV file system. As a User of `netcfgbu` you are required to create an inventory CSV file based
-on your inventory sources and adhere to a few basic field-name requirements, as
+`netcfgbu` tool operates using a simple CSV file system. As a User of
+`netcfgbu` you are required to create an inventory CSV file based on your
+inventory sources and adhere to a few basic field-name requirements, as
 described in the [Inventory](inventory.md) docs.  You could create this file by
 hand, or you could build it dynamically from a SoT such as Netbox.  As a result
 of this decision, the `netcfgbu` provides the subcommand `inventory build` so
@@ -89,16 +90,16 @@ principles are supported; and you will not need to wait for your device to be
 supported. The way this decision was approached was through the use of the
 inventory field `os_name`.  `os_name` is used to uniquely identify the device
 operating system name (and potentially version). The value that you use in the
-field *is completely up to you*.  There is no hard-coded mapping of supported OS
-names because `netcfgbu` is not built following a supported OS model design.
+field *is completely up to you*.  There is no hard-coded mapping of supported
+OS names because `netcfgbu` is not built following a supported OS model design.
 For example you can use the value "nxos" or "nexus" or "nx-os" as your
 `os_name` for Cisco NX-OS based devices **so long as** you create the necessary
 configuration using that same name.
 
-By way of example from the [netcfgbu.toml](../netcfgbu.toml) sample,
-the following section says that any inventory item with the `os_name` field equal to "nxos"
-will use the command `show running-config | no-more` as the command to obtain
-the running configuration file.
+By way of example from the [netcfgbu.toml](../netcfgbu.toml) sample, the
+following section says that any inventory item with the `os_name` field equal
+to "nxos" will use the command `show running-config | no-more` as the command
+to obtain the running configuration file.
 
 ```toml
 [os_name.nxos]
@@ -165,10 +166,10 @@ Execution speed was a factor in the design decision as applied to the goal
 of reducing User friction.  There are automation use-cases that follow
 a general pattern:
 
-   step-1: take snapshot of network configs before making changes to network
-   step-2: make network config changes
-   step-3: validate network is working as expected
-   step-4: take snapshot of network configs
+   * step-1: take snapshot of network configs before making changes to network
+   * step-2: make network config changes
+   * step-3: validate network is working as expected
+   * step-4: take snapshot of network configs
 
 And if step-3 should fail we can revert to the configs in step-1.
 
@@ -176,13 +177,13 @@ To design goal for speed to to reduce the amount of time spent in step-1 so
 that we can get to the actual work of steps 2 and 3.  Consider the difference
 in User experience it would mean if step-1 took 60 minutes vs. 60 seconds.
 
-With that design goal in mind I chose to take advantage of the modern Python 3.8
-asyncio features rather than using a traditional threading approach.  I have many
-years experience of software experience dealing with multi-threaded applications and
-my net-net from all of it is to avoid when possible :-)  Python 3.8 asyncio feature
-maturity coupled with the maturity of the asyncssh package allowed me to implement
-`netcfgbu` to maximize speed, reduce user friction, and increase reliability by
-avoiding threading.
+With that design goal in mind I chose to take advantage of the modern Python
+3.8 asyncio features rather than using a traditional threading approach.  In my
+many years dealing with multi-threaded applications, my net-net from all of it
+is to avoid when possible :-)  Python 3.8 asyncio feature maturity coupled with
+the maturity of the asyncssh package allowed me to implement `netcfgbu` to
+maximize speed, reduce user friction, and increase reliability by avoiding
+threading.
 
 ## Fin
 I do hope this document sheds some light on my motivations for creating

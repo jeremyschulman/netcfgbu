@@ -93,7 +93,7 @@ def test_filtering_fail_filepath(tmpdir):
     assert errmsg == abs_filepath
 
 
-def test_filtering_pass_filecontents_csv(tmpdir):
+def test_filtering_pass_csv_filecontents(tmpdir):
     """
     Test use-case where the constraint is a valid CSV file.
     """
@@ -134,26 +134,63 @@ def test_filtering_pass_filecontents_csv(tmpdir):
         assert filter_fn(rec) is True
 
 
-def test_filtering_fail_filecontents_csv():
+def test_filtering_fail_csv_missinghostfield(tmpdir):
     """
     Test use-case where the constraint is an invalid CSV file; meaning that there
     is no `host` field.
     """
-    pass
+    filename = "failures.csv"
+    tmpfile = tmpdir.join(filename)
+
+    # create an inventory that does not use 'host' as required, but uses
+    # 'hostname' instead.
+
+    inventory_recs = [
+        dict(hostname="swtich1.nyc1", os_name="eos"),
+        dict(hostname="switch2.dc1", os_name="ios"),
+    ]
+
+    with open(tmpfile, "w+") as ofile:
+        csv_wr = csv.DictWriter(ofile, fieldnames=["hostname", "os_name"])
+        csv_wr.writeheader()
+        csv_wr.writerows(inventory_recs)
+
+    abs_filepath = str(tmpfile)
+
+    with pytest.raises(ValueError) as excinfo:
+        create_filter(constraints=[f"@{abs_filepath}"], field_names=["hostname"])
+
+    errmsg = excinfo.value.args[0]
+    assert "does not contain host content as expected" in errmsg
 
 
-def test_filtering_fail_file_notcsv():
+def test_filtering_fail_csv_filecontentsnotcsv(tmpdir):
     """
     Test use-case where the constraint expects a CSV file, but the file is not
     a CSV file due to contents; i.e. when attempting to read the CSV file it fails
     to load content.
     """
-    pass
+
+    # rather than provide a CSV file, provide this python file (not a CSV file).
+    # but call it a CSV file.
+
+    filepath = tmpdir.join("dummy.csv")
+    filepath.mklinkto(__file__)
+
+    with pytest.raises(ValueError) as excinfo:
+        create_filter(constraints=[f"@{filepath}"], field_names=["host"])
+
+    errmsg = excinfo.value.args[0]
+    assert "does not contain host content as expected" in errmsg
 
 
-def test_filtering_pass_filecontents_txt():
-    pass
+def test_filtering_fail_csv_notcsvfile():
+    """
+    Test use-case when the provided file is not a CSV, and indicated by the
+    filename suffix not being '.csv'
+    """
+    with pytest.raises(ValueError) as excinfo:
+        create_filter(constraints=[f"@{__file__}"], field_names=["host, os_name"])
 
-
-def test_filtering_fail_filecontents_txt():
-    pass
+    errmsg = excinfo.value.args[0]
+    assert "not a CSV file." in errmsg

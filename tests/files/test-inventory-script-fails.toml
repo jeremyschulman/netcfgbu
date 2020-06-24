@@ -1,0 +1,14 @@
+[[inventory]]
+    script = "${SCRIPT_DIR}/do-fail.sh"
+
+[logging.loggers.netcfgbu]
+    handlers = ["console"]
+    level = "INFO"
+
+[logging.handlers.console]
+    class = "logging.StreamHandler"
+    formatter = "basic"
+    stream = "ext://sys.stdout"
+
+[logging.formatters.basic]
+    format = "%(asctime)s %(levelname)s: %(message)s"

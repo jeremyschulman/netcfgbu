@@ -105,8 +105,12 @@ Example:
 
 ### System Requirements and Installation
 
-This tool requires the use of Python3.8.  You will need to git-clone this repository
-and run `python setup.py` to install it into your environment.
+This tool requires the use of Python3.8.<br/>
+Instsallation available via PyPI:
+
+```shell script
+$ pip install netcfgbu
+```
 
 ### Questions or Suggestions?
 
