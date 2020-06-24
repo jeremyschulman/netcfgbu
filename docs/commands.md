@@ -1,6 +1,6 @@
 # Commands
 
-This page presents an overview of the `netcfgbu` commands.  For full command details use the 
+This page presents an overview of the `netcfgbu` commands.  For full command details use the
 CLI `--help` option.
 
 For any devices that fail during a command, the `netcfgbu` tool will generate a
@@ -29,11 +29,11 @@ $ netcfgbu inventory build --name netbox
 **probe**<br/>
 The `probe` command is used to determine if the SSH port is available on the target device.  This
 is a useful first step before attempting to run a backup.  This probe does **not** attempt to
-login / authenticate with SSH. 
+login / authenticate with SSH.
 
 ```shell script
 $ netcfgbu probe
-```  
+```
 
 **login**<br/>
 The `login` command is used to determine if the `netcfgbu` is able to authenticate with the
@@ -43,7 +43,7 @@ with the correct credentials to allow a connection.
 
 ```shell script
 $ netcfgbu probe
-```  
+```
 
 **backup**<br/>
 This `backup` command is used to login to the device via SSH, extract the

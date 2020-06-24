@@ -13,14 +13,14 @@ As a one-time initial step you will need to run the `prepare` subcommand so that
 directory used for config backups (`configs_dir`) is initialized for use with your chosen platform.
 
 This command will run the necessary command to initialize the directory for
-git usage and fetch the current git repository files.  
+git usage and fetch the current git repository files.
 
 ```shell script
 $ netcfgbu vcs prepare
-``` 
+```
 
 If you have more than one `[[git]]` configuraiton section defined, you can
-use the `--name` option.  
+use the `--name` option.
 
 For example, if you have a configuraiton with `name = "firewalls"` defined you
 would run:

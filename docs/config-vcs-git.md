@@ -8,7 +8,7 @@ will need to define at least one `[[git]]` section in your configuration file.
   * Git SSH deployment key with passphrase
 
 ___
- 
+
 :question: If you are not certain which method you want to use, refer to the document
 links in the [References](#References) below.
 
@@ -26,7 +26,7 @@ Each `[[git]]` section supports the following options:
 
 **name**<br/>
 When your configuration file contains multiple `[git]` sections you can
-assign a name so that you can use the `--name` option when running the 
+assign a name so that you can use the `--name` option when running the
 `netcfgbu vcs` subcommands.
 
 **repo**<br/>
@@ -79,7 +79,7 @@ This option supports the use of Enviornment variables.
     name = "demo-key-pw"
     repo = "git@github.mycorp.com:jschulman/test-network-configs.git"
     deploy_key = "$HOME/pwtest-backups"
-    deploy_passphrase = "$GITKEY_PASSWORD"  
+    deploy_passphrase = "$GITKEY_PASSWORD"
 ```
 
 ## References

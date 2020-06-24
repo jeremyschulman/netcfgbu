@@ -4,6 +4,7 @@ This file contains the filtering functions that are using to process the
 not specific to the netcfgbu inventory column names, can could be re-used for
 other CSV related tools and use-cases.
 """
+from typing import List, AnyStr, Optional, Callable, Dict
 import re
 import operator
 from pathlib import Path
@@ -66,7 +67,35 @@ def mk_file_filter(filepath):
     return op_filter
 
 
-def create_filter(constraints, field_names, include=True):
+def create_filter(
+    constraints: List[AnyStr], field_names: List[AnyStr], include: Optional[bool] = True
+) -> Callable[[Dict], bool]:
+    """
+    This function returns a function that is used to filter inventory records.
+
+    Parameters
+    ----------
+    constraints:
+        A list of contraint expressions that are in the form "<field-name>=<value>".
+
+    field_names:
+        A list of known field names
+
+    include:
+        When True, the filter function will match when the constraint is true,
+        for example if the contraint is "os_name=eos", then it would match
+        records that have os_name field euqal to "eos".
+
+        When False, the filter function will match when the constraint is not
+        true. For exampl if the constraint is "os_name=eos", then the filter
+        function would match recoreds that have os_name fields not equal to
+        "eos".
+
+    Returns
+    -------
+    The returning filter function expects an inventory record as the single
+    input parameter, and the function returns True/False on match.
+    """
     fieldn_pattern = "^(?P<keyword>" + "|".join(fieldn for fieldn in field_names) + ")"
     field_value_reg = re.compile(fieldn_pattern + "=" + value_pattern)
 
@@ -93,7 +122,9 @@ def create_filter(constraints, field_names, include=True):
             value_reg = re.compile(f"^{value}$", re.IGNORECASE)
 
         except re.error as exc:
-            raise ValueError(f"Invalid filter expression: {filter_expr}: {str(exc)}")
+            raise ValueError(
+                f"Invalid filter regular-expression: {filter_expr}: {str(exc)}"
+            )
 
         op_filters.append(mk_op_filter(value_reg, fieldn))
 

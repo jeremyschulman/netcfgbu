@@ -1,14 +1,12 @@
-
-
 import os
 from pathlib import Path
 from setuptools import setup, find_packages
 
-package_name = 'netcfgbu'
-package_version = open('VERSION').read().strip()
+package_name = "netcfgbu"
+package_version = open("VERSION").read().strip()
 
 
-def requirements(filename='requirements.txt'):
+def requirements(filename="requirements.txt"):
     return open(filename.strip()).readlines()
 
 
@@ -19,26 +17,24 @@ with open("README.md", "r") as fh:
 setup(
     name=package_name,
     version=package_version,
-    description='Network Configuration Backup',
+    description="Network Configuration Backup",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author='Jeremy Schulman',
+    author="Jeremy Schulman",
     packages=find_packages(),
     include_package_data=True,
     install_requires=requirements(),
-
-    scripts=[str(script)
-             for script in Path('bin').iterdir()
-             if os.access(script, os.X_OK)],
-
+    scripts=[
+        str(script) for script in Path("bin").iterdir() if os.access(script, os.X_OK)
+    ],
     classifiers=[
-        'Development Status :: 3 - Alpha',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: Apache Software License',
-        'Operating System :: MacOS :: MacOS X',
-        'Operating System :: POSIX',
-        'Programming Language :: Python :: 3.8',
-        'Topic :: Software Development :: Libraries :: Python Modules',
-        'Topic :: System :: Networking'
-    ]
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: Apache Software License",
+        "Operating System :: MacOS :: MacOS X",
+        "Operating System :: POSIX",
+        "Programming Language :: Python :: 3.8",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Topic :: System :: Networking",
+    ],
 )

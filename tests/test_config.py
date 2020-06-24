@@ -108,13 +108,13 @@ def test_config_git_pass(request, netcfgbu_envars, monkeypatch):
     Test the case where a [[git]] section is properly configured.
     """
     monkeypatch.setenv("GIT_TOKEN", "fake-token")
-    monkeypatch.setenv("GITKEY_PASSWORD", 'fake-password')
+    monkeypatch.setenv("GITKEY_PASSWORD", "fake-password")
 
     fileio = open(f"{request.fspath.dirname}/config_files/test-gitspec.toml")
     app_cfg = load(fileio=fileio)
 
-    assert app_cfg.git[0].token.get_secret_value() == 'fake-token'
-    assert app_cfg.git[2].deploy_passphrase.get_secret_value() == 'fake-password'
+    assert app_cfg.git[0].token.get_secret_value() == "fake-token"
+    assert app_cfg.git[2].deploy_passphrase.get_secret_value() == "fake-password"
 
 
 def test_config_git_fail_badrepo(request, netcfgbu_envars, monkeypatch):
@@ -128,7 +128,7 @@ def test_config_git_fail_badrepo(request, netcfgbu_envars, monkeypatch):
     exc_errmsgs = excinfo.value.args[0].splitlines()
     found = first([line for line in exc_errmsgs if "git.0.repo" in line])
     assert found
-    assert 'Bad repo URL' in found
+    assert "Bad repo URL" in found
 
 
 def test_config_inventory_pass(request, netcfgbu_envars):
@@ -151,7 +151,7 @@ def test_config_inventory_fail_noscript(request, netcfgbu_envars):
     exc_errmsgs = excinfo.value.args[0].splitlines()
     found = first([line for line in exc_errmsgs if "inventory.0.script" in line])
     assert found
-    assert 'File not found:' in found
+    assert "File not found:" in found
 
 
 def test_config_inventory_fail_script_noexec(netcfgbu_envars, tmpdir):
@@ -159,18 +159,13 @@ def test_config_inventory_fail_script_noexec(netcfgbu_envars, tmpdir):
     Test the case where an [[inventory]] section defines a script, the script
     file exists, but the script file is not executable.
     """
-    fake_script = tmpdir.join('dummy-script.sh')
+    fake_script = tmpdir.join("dummy-script.sh")
     fake_script.ensure()
 
-    config_data = {
-        'inventory': [{
-            'name': 'foo',
-            'script': str(fake_script)
-        }]
-    }
+    config_data = {"inventory": [{"name": "foo", "script": str(fake_script)}]}
 
     strio = StringIO()
-    strio.name = 'fake-file'
+    strio.name = "fake-file"
     toml.dump(config_data, strio)
     strio.seek(0)
 
@@ -180,7 +175,7 @@ def test_config_inventory_fail_script_noexec(netcfgbu_envars, tmpdir):
     exc_errmsgs = excinfo.value.args[0].splitlines()
     found = first([line for line in exc_errmsgs if "inventory.0.script" in line])
     assert found
-    assert 'is not executable' in found
+    assert "is not executable" in found
 
 
 def test_config_linter_pass(netcfgbu_envars, request):
@@ -191,9 +186,9 @@ def test_config_linter_pass(netcfgbu_envars, request):
     fileio = open(f"{request.fspath.dirname}/config_files/test-linter.toml")
     app_cfg = load(fileio=fileio)
 
-    assert app_cfg.os_name['ios']
-    assert app_cfg.os_name['ios'].linter == 'ios'
-    assert app_cfg.linters['ios']
+    assert app_cfg.os_name["ios"]
+    assert app_cfg.os_name["ios"].linter == "ios"
+    assert app_cfg.linters["ios"]
 
 
 def test_config_linter_fail(netcfgbu_envars, request):

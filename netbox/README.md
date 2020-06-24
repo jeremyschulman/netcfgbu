@@ -34,9 +34,9 @@ The URL to your netbox server, for example: "https://netbox.mycorp.com"
 The Netbox API token that has read access to the system.
 
 #### Configuration File
-    
-Ensure your `netcfgbu.toml` file includes an `[inventory]` definition to execute the script to generate 
-the inventory.csv file.  
+
+Ensure your `netcfgbu.toml` file includes an `[inventory]` definition to execute the script to generate
+the inventory.csv file.
 
 The following example has the script located in /usr/local/bin, will exclude
 any device that has a tag "no-backup", and will save the contents to the file
@@ -55,7 +55,7 @@ To build the inventory run the following command:
 
 ```shell script
 $ netcfgbu inventory build --name netbox
-``` 
+```
 
 As output you will see similar:
 ```shell script

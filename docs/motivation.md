@@ -18,7 +18,7 @@ features that I need.  I have a very long career developing commercial and
 open-source products in many languages, including Perl (Rancid) and Ruby
 (Oxidized).  That said, as a member of the network automation community in 2020
 I find myself working with Python as the de-facto programming language promoted
-and presented as "The Next Thing".  
+and presented as "The Next Thing".
 
 ### Guiding Principles
 As a member of the network automation community every tool or system that I
@@ -28,13 +28,13 @@ and confidence is using the tool.  Second is to make decisions that reduce
 operator friction in installing, configuring, and using the tool.  Ideally a
 User should be able to install and start using the tool very quickly so they
 get that first "Ah ha!" experience with little to no effort.
- 
+
 ### Influences
 There are many tools that I've used over the years that have influenced the design
 and implementation decisions put into `netcfgbu`.  There are many experiences
 that I have had working with open-source projects that have been influences.
 
-#### Limit Dependencies 
+#### Limit Dependencies
 I wanted to build `netcfgbu` with the minimum number of dependencies in terms
 of 3rd-party packages.  There are many network device driver libraries out
 there, such as [Netmiko](https://github.com/ktbyers/netmiko),
@@ -57,7 +57,7 @@ requires that any credential you use **MUST** allow the necessary `get_config`
 and `pre_get_config` commands without having to execute any privledge enable
 commands.  This simplifying constraint results in the fact that the `netcfgbu`
 tool does not need to account for running any privilege mode commands or
-dealing with the complexity associated with those mechanisms.  
+dealing with the complexity associated with those mechanisms.
 
 I would further go so far as to submit that as a network automation best-practice
 you should create a specific login account to perform the config backup service, for example
@@ -90,7 +90,7 @@ supported. The way this decision was approached was through the use of the
 inventory field `os_name`.  `os_name` is used to uniquely identify the device
 operating system name (and potentially version). The value that you use in the
 field *is completely up to you*.  There is no hard-coded mapping of supported OS
-names because `netcfgbu` is not built following a supported OS model design. 
+names because `netcfgbu` is not built following a supported OS model design.
 For example you can use the value "nxos" or "nexus" or "nx-os" as your
 `os_name` for Cisco NX-OS based devices **so long as** you create the necessary
 configuration using that same name.
@@ -169,7 +169,7 @@ a general pattern:
    step-2: make network config changes
    step-3: validate network is working as expected
    step-4: take snapshot of network configs
-   
+
 And if step-3 should fail we can revert to the configs in step-1.
 
 To design goal for speed to to reduce the amount of time spent in step-1 so
@@ -192,7 +192,7 @@ work for you that is great!  We all learn and grow by [standing on the
 shoulders of
 giants](https://en.wikipedia.org/wiki/Standing_on_the_shoulders_of_giants). If
 you are looking for a network backup configuration tool please give `netcfgbu`
-a try.  I'm here to help if you get stuck or need any assistance. 
+a try.  I'm here to help if you get stuck or need any assistance.
 
 Cheers,<br/>
 -- Jeremy Schulman<br/>

@@ -2,7 +2,7 @@
 
 This page describes how you can filter the inventory file so that only the
 desired items are used in the execution of a command.  There are two methods
-for filtering records: by field-name(s) and by file-contents.  
+for filtering records: by field-name(s) and by file-contents.
 
 Use the `--limit` option to include only those items that match on the filter criteria.
 Use the `--exclude` option to exclude inventory items based on the filter criteria.
@@ -49,7 +49,7 @@ $ netcfgbu backup --exclude @failures.csv
 
 ### CSV Files
 When using a CSV file, you must ensure the file extension is `.csv` and that the first
-line includes a field-header row with a `host` column. 
+line includes a field-header row with a `host` column.
 
 ### Plain-Text Files
 When using a plain-text file the first word on each line will be used as the host value

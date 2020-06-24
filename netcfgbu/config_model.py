@@ -164,7 +164,7 @@ class AppConfig(NoExtraBaseModel):
 
     @validator("os_name")
     def _linters(cls, v, values):  # noqa
-        linters = values.get('linters') or {}
+        linters = values.get("linters") or {}
         for os_name, os_spec in v.items():
             if os_spec.linter and os_spec.linter not in linters:
                 raise ValueError(
