@@ -37,9 +37,7 @@ def exec_backup(app_cfg, inventory_recs):
         nonlocal done
 
         if app_cfg.jumphost:
-            await jumphosts.init_jumphosts(
-                app_cfg.jumphost, field_names=inventory_recs[0].keys()
-            )
+            await jumphosts.connect_jumphosts()
 
         async for task in as_completed(backup_tasks):
             done += 1

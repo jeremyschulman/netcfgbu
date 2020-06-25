@@ -3,6 +3,7 @@
 #### v0.5.0
    * BREAKING Change: removed support of non-CSV files for filtering "@<file>".  Only
    CSV files are currently supported.
+   * Addes support for SSH jumphost proxy, see [Using Jumphosts](docs/config-ssh-jumphost.md)
    * Added CI/CD tooling - tox & friends, github actions, pre-commit
    * Added unit-test coverage for full infrastructure components; that is
    everything but the CLI.

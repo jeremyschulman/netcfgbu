@@ -43,9 +43,7 @@ def exec_test_login(app_cfg: AppConfig, inventory_recs, cli_opts):
         nonlocal done
 
         if app_cfg.jumphost:
-            await jumphosts.init_jumphosts(
-                app_cfg.jumphost, field_names=inventory_recs[0].keys()
-            )
+            await jumphosts.connect_jumphosts()
 
         async for task in as_completed(login_tasks):
             done += 1

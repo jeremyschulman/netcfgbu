@@ -1,4 +1,4 @@
-# Configuratiion for Use with Jump Hosts
+# Configuration for Use with Jump Hosts
 
 *Added in 0.5.0*
 
@@ -17,6 +17,10 @@ section supports the following fields:
 
    * `timeout` - *(Optional)* A timeout in seconds when connecting to the jump host server.  If
    not provided, will use the default connection timeout value (30s)
+
+Using jump hosts currently requires that you are also using an ssh-agent and have
+loaded any ssh-keys so that the `$SSH_AUTH_SOCK` environment variable exists
+and running `ssh-add -l` shows that your ssh keys have been loaded for use.
 
 ### Examples
 

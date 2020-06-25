@@ -9,6 +9,7 @@ from first import first
 import netcfgbu
 from netcfgbu import config as _config
 from netcfgbu import inventory as _inventory
+from netcfgbu import jumphosts
 
 
 VERSION = metadata.version(netcfgbu.__package__)
@@ -48,11 +49,15 @@ class WithInventoryCommand(click.Command):
             if ctx.params["inventory"]:
                 ctx.obj["app_cfg"].defaults.inventory = ctx.params["inventory"]
 
-            ctx.obj["inventory_recs"] = _inventory.load(
+            inv = ctx.obj["inventory_recs"] = _inventory.load(
                 app_cfg=app_cfg,
                 limits=ctx.params["limit"],
                 excludes=ctx.params["exclude"],
             )
+
+            # if there is jump host configuraiton then prepare for later use.
+            if app_cfg.jumphost:
+                jumphosts.init_jumphosts(jumphost_specs=app_cfg.jumphost, inventory=inv)
 
         except FileNotFoundError as exc:
             sys.exit(f"File not found: {exc.filename}")
