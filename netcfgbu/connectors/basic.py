@@ -13,6 +13,8 @@ from netcfgbu.config_model import AppConfig, OSNameSpec, Credential
 from netcfgbu.logger import get_logger
 from netcfgbu import consts
 from netcfgbu import linter
+from netcfgbu import jumphosts
+
 
 __all__ = ["BasicSSHConnector", "set_max_startups"]
 
@@ -223,6 +225,7 @@ class BasicSSHConnector(object):
         creds = list()
 
         # use credential from inventory host record first, if defined
+        # TODO: bug-fix where these values are None; but exist in dict :-(
         if all(key in self.host_cfg for key in ("username", "password")):
             creds.append(
                 Credential(
@@ -273,6 +276,12 @@ class BasicSSHConnector(object):
         """
 
         timeout: int = self.os_spec.timeout
+
+        # if this host requires the use of a JumpHost, then configure the
+        # connection args to include the supporting jumphost tunnel connection.
+
+        if jh := jumphosts.get_jumphost(self.host_cfg):
+            self.conn_args["tunnel"] = jh.tunnel
 
         # interate through all of the credential options until one is accepted.
         # the number of max setup connections is controlled by a semaphore

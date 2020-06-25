@@ -24,6 +24,7 @@ __all__ = [
     "OSNameSpec",
     "LinterSpec",
     "GitSpec",
+    "JumphostSpec",
 ]
 
 _var_re = re.compile(
@@ -152,6 +153,18 @@ class InventorySpec(NoExtraBaseModel):
         return script_exec
 
 
+class JumphostSpec(NoExtraBaseModel):
+    proxy: str
+    name: Optional[str]
+    include: Optional[List[str]]
+    exclude: Optional[List[str]]
+    timeout: PositiveInt = Field(consts.DEFAULT_LOGIN_TIMEOUT)
+
+    @validator("name", always=True)
+    def _default_name(cls, value, values):  # noqa
+        return values["proxy"] if not value else value
+
+
 class AppConfig(NoExtraBaseModel):
     defaults: Defaults
     credentials: Optional[List[Credential]]
@@ -161,6 +174,7 @@ class AppConfig(NoExtraBaseModel):
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
     git: Optional[List[GitSpec]]
+    jumphost: Optional[List[JumphostSpec]]
 
     @validator("os_name")
     def _linters(cls, v, values):  # noqa

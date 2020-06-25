@@ -19,9 +19,12 @@ from .root import (
 )
 
 from .report import Report, err_reason
+from netcfgbu import jumphosts
+from netcfgbu.config_model import AppConfig
 
 
-def exec_test_login(app_cfg, inventory_recs, cli_opts):
+def exec_test_login(app_cfg: AppConfig, inventory_recs, cli_opts):
+
     login_tasks = {
         make_host_connector(rec, app_cfg).test_login(timeout=cli_opts["timeout"]): rec
         for rec in inventory_recs
@@ -38,6 +41,11 @@ def exec_test_login(app_cfg, inventory_recs, cli_opts):
 
     async def process_batch():
         nonlocal done
+
+        if app_cfg.jumphost:
+            await jumphosts.init_jumphosts(
+                app_cfg.jumphost, field_names=inventory_recs[0].keys()
+            )
 
         async for task in as_completed(login_tasks):
             done += 1

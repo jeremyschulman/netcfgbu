@@ -11,16 +11,12 @@
 
 from invoke import task
 
-PYTHON_PATHS = ["netcfgbu/", "bin/netcfgbu", "netbox/*.py", "tests/*.py"]
-
 
 @task
-def lint(ctx):
+def precheck(ctx):
     ctx.run("black .")
     ctx.run("flake8 .")
-    # for each in PYTHON_PATHS:
-    #     ctx.run(f"black {each}")
-    #     ctx.run(f"flake8 {each}")
+    ctx.run("interrogate -c pyproject.toml --exclude=build", pty=True)
 
 
 @task

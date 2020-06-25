@@ -57,13 +57,17 @@ class WithInventoryCommand(click.Command):
         except FileNotFoundError as exc:
             sys.exit(f"File not found: {exc.filename}")
 
-        except RuntimeError as exc:
+        except (ValueError, RuntimeError) as exc:
             ctx.fail(f"{exc.args[0]}")
 
         if not ctx.obj["inventory_recs"]:
-            sys.exit("No inventory matching limits.")
+            sys.exit(f"No inventory matching limits in: {app_cfg.defaults.inventory}")
 
-        super().invoke(ctx)
+        try:
+            super().invoke(ctx)
+
+        except RuntimeError as exc:
+            sys.exit(exc)
 
 
 # -----------------------------------------------------------------------------

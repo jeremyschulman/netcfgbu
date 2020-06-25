@@ -1,0 +1,30 @@
+# Configuratiion for Use with Jump Hosts
+
+*Added in 0.5.0*
+
+You can configure one or more jump host proxy servers.  Each ``[jumphost]]``
+section supports the following fields:
+
+   * `proxy` - Defines the jump host proxy destination.  This string value can
+     be in the form "[user@]host[:port]". If `user` is not provided, then $USER
+     from the environment will be used
+
+   * `include` - *(Optional)* A list of [filter](usage-filtering.md) expressions that identify
+   which inventory records will be matched to use this jump host
+
+   * `exclude` - *(Optional)* A list of [filter](usage-filtering.md) expressions that identify
+   which inventory records will be matched to use this jumphost
+
+   * `timeout` - *(Optional)* A timeout in seconds when connecting to the jump host server.  If
+   not provided, will use the default connection timeout value (30s)
+
+### Examples
+
+For any inventory item that matches the host with a suffix of ".dc1" use the jump server
+"dc1-jumpie.com" with login user-name "jeremy"
+
+```toml
+[[jumphost]]
+    proxy = "jeremy@dc1-jumpie.com"
+    include = ['host=.*\.dc1']
+```

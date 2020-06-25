@@ -19,9 +19,3 @@ repos:
     hooks:
     -   id: black
         args: ["."]
-
-#-   repo: https://github.com/econchick/interrogate
-#    rev: 1.2.0
-#    hooks:
-#      - id: interrogate
-#        args: ["-cpyproject.toml"]
