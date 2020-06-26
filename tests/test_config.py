@@ -3,10 +3,12 @@ from io import StringIO
 from pathlib import Path
 
 import pytest  # noqa
+from pydantic import ValidationError
 from first import first
 import toml
 
 from netcfgbu.config import load
+from netcfgbu import config_model
 
 
 def test_config_onlyenvars_pass(monkeypatch, netcfgbu_envars):
@@ -242,3 +244,38 @@ def test_config_fail_asfilepath(tmpdir):
         load(filepath=noexist_filepath)
 
     assert excinfo.value.filename == noexist_filepath
+
+
+def test_config_jumphost_name(netcfgbu_envars, request):
+    abs_filepath = request.fspath.dirname + "/files/test-config-jumphosts.toml"
+    app_cfg = load(filepath=abs_filepath)
+    jh = app_cfg.jumphost[0]
+    assert jh.name == jh.proxy
+
+    jh = app_cfg.jumphost[1]
+    assert jh.name != jh.proxy
+
+
+def test_vcs_fail_config():
+
+    with pytest.raises(ValidationError) as excinfo:
+        config_model.GitSpec(
+            repo="git@dummy.git", password="fooer", deploy_passphrase="foobaz"
+        )
+
+    errs = excinfo.value.errors()
+    assert errs[0]["msg"] == "deploy_key required when using deploy_passphrase"
+
+    with pytest.raises(ValidationError) as excinfo:
+        config_model.GitSpec(repo="git@dummy.git")
+
+    errs = excinfo.value.errors()
+    assert errs[0]["msg"].startswith("Missing one of required auth method fields")
+
+    with pytest.raises(ValidationError) as excinfo:
+        config_model.GitSpec(
+            repo="git@dummy.git", token="token", deploy_key="dummy-file"
+        )
+
+    errs = excinfo.value.errors()
+    assert errs[0]["msg"].startswith("Only one of")

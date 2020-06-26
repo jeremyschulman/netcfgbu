@@ -5,6 +5,8 @@ flake8
 flake8-breakpoint
 pytest
 pytest-cov
+pytest-asyncio
+asynctest
 tox
 pre-commit
 interrogate

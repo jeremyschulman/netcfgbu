@@ -1,0 +1,6 @@
+[[jumphost]]
+    proxy = "1.2.3.4"
+
+[[jumphost]]
+    proxy = "11.22.33.44"
+    name = 'foobaz'

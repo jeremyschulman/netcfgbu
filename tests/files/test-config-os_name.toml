@@ -1,0 +1,2 @@
+[os_name.ios]
+    get_config = 'fake show running-config'

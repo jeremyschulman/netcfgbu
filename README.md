@@ -82,16 +82,16 @@ Commands:
 
 # Setup
 
-The `netcfgbu` tool requires you to setup a
-[TOML](https://github.com/toml-lang/toml)
-[configuration](docs/configuration-file.md) file, by default is called
-`netcfgbu.toml` and is searched for in the current working directory. You can
-override this location using the `-C <filepath>` option or using the
+The `netcfgbu` tool does not require you to create a configuration file, but
+for practical purposes you will generally need one.  The file is
+[TOML](https://github.com/toml-lang/toml) format.  The default file is
+`netcfgbu.toml` and `netcfgbu` searches for in the current working directory.
+You can override this location using the `-C <filepath>` option or using the
 environment variable `NETCFGBU_CONFIG`
 
-At a minimum you need to designate the [inventory](docs/inventory.md) file and
+At a minimum you need to designate the [inventory](docs/inventory.md) CSV file and
 a default set of SSH login credentials.  The network device configs will be
-stored in the current working directory, or as specified in the `configs_dir`
+stored in the current working directory, or as specified in the `defaults.configs_dir`
 option.  The configuration-file supports the use of environment variables.
 
 Example:
@@ -103,10 +103,22 @@ Example:
     credentials.password = "$NETWORK_PASSWORD"
 ```
 
+The `netcfgbu` defines the use of specific [Environment Variables](docs/environment_variables.md).  Their
+use is the equivalent of the following configuration file.  That is to say, if you did not provide `netcfgbu` a
+configuration file, this would be used:
+
+```toml
+[defaults]
+    inventory = "$NETCFBU_INVENTORY"
+    configs_dir = "$NETCFGBU_CONFIGSDIR"
+    credentials.username = "$NETCFGBU_DEFAULT_USERNAME"
+    credentials.password = "$NETCFGBU_DEFAULT_PASSWORD"
+```
+
 ### System Requirements and Installation
 
 This tool requires the use of Python3.8.<br/>
-Instsallation available via PyPI:
+Installation available via PyPI:
 
 ```shell script
 $ pip install netcfgbu

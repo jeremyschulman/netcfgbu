@@ -1,6 +1,23 @@
+"""
+This module contains the probe corutine used to validate that a target device
+has a given port open.
+"""
+
+# -----------------------------------------------------------------------------
+# System Imports
+# -----------------------------------------------------------------------------
+
 import asyncio
 
+
 __all__ = ["probe"]
+
+
+# -----------------------------------------------------------------------------
+#
+#                              CODE BEGINS
+#
+# -----------------------------------------------------------------------------
 
 
 async def probe(host, port=22, timeout=10, raise_exc=False) -> bool:

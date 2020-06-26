@@ -1,12 +1,8 @@
 import pytest  # noqa
-import logging
-
 from first import first
-
 
 from netcfgbu import inventory
 from netcfgbu import config
-from netcfgbu.logger import get_logger
 
 
 def test_inventory_pass(request, monkeypatch, netcfgbu_envars):
@@ -59,7 +55,7 @@ def test_inventory_pass_build(request, monkeypatch, netcfgbu_envars):
     assert rc == 0
 
 
-def test_inventory_fail_build_exitnozero(request, monkeypatch, netcfgbu_envars, caplog):
+def test_inventory_fail_build_exitnozero(request, monkeypatch, netcfgbu_envars):
     """
     Test the use-case where the configuraiton contains an inventory build
     script.  The script exists, it runs but exists with non-zero return code.
@@ -67,19 +63,12 @@ def test_inventory_fail_build_exitnozero(request, monkeypatch, netcfgbu_envars, 
     files_dir = request.fspath.dirname + "/files"
     monkeypatch.setenv("SCRIPT_DIR", files_dir)
     config_fpath = files_dir + "/test-inventory-script-fails.toml"
-    lgr = get_logger()
-    caplog.set_level(logging.WARNING, logger=lgr.name)
 
     app_cfg = config.load(filepath=config_fpath)
     inv_def = app_cfg.inventory[0]
     rc = inventory.build(inv_def)
 
     assert rc != 0
-
-    # check the last log record to verify that the warning message exists as
-    # expected.
-
-    assert "script returned non-zero return code" in caplog.records[-1].message
 
 
 def test_inventory_fail_build_noscript(request, netcfgbu_envars):

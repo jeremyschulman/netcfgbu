@@ -1,5 +1,3 @@
-import os
-from pathlib import Path
 from setuptools import setup, find_packages
 
 package_name = "netcfgbu"
@@ -24,9 +22,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=requirements(),
-    scripts=[
-        str(script) for script in Path("bin").iterdir() if os.access(script, os.X_OK)
-    ],
+    scripts=["bin/netcfgbu"],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

@@ -4,7 +4,8 @@ from netcfgbu.config_model import AppConfig, OSNameSpec
 
 def get_os_spec(rec, app_cfg: AppConfig):
     os_name = rec["os_name"]
-    return app_cfg.os_name.get(os_name) or OSNameSpec()
+    os_specs = app_cfg.os_name or {}
+    return os_specs.get(os_name) or OSNameSpec()
 
 
 def make_host_connector(rec, app_cfg: AppConfig):

@@ -12,6 +12,7 @@ from pydantic import (
     PositiveInt,
     Field,
     validator,
+    root_validator,
 )
 
 
@@ -120,6 +121,24 @@ class GitSpec(NoExtraBaseModel):
                 f"Bad repo URL [{repo}]: expected to start with {expected}."
             )
         return repo
+
+    @root_validator
+    def enure_proper_auth(cls, values):
+        req = ("token", "deploy_key", "password")
+        auth_vals = list(filter(None, (values.get(auth) for auth in req)))
+        auth_c = len(auth_vals)
+        if not auth_c:
+            raise ValueError(
+                f'Missing one of required auth method fields: {"|".join(req)}'
+            )
+
+        if auth_c > 1:
+            raise ValueError(f'Only one of {"|".join(req)} allowed')
+
+        if values.get("deploy_passphrase") and not values.get("deploy_key"):
+            raise ValueError("deploy_key required when using deploy_passphrase")
+
+        return values
 
 
 class OSNameSpec(NoExtraBaseModel):

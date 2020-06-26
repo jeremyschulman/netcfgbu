@@ -45,7 +45,7 @@ def tag_name_timestamp() -> str:
     Create the tag name using the current time with
     format <year><month#><day#>_<24hr><minute><sec>
     """
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    return datetime.now().strftime("%Y%m%d_%H%M%S")  # pragma: no cover
 
 
 # -----------------------------------------------------------------------------
@@ -60,7 +60,6 @@ def vcs_save(gh_cfg: GitSpec, repo_dir: Path, tag_name: Optional[str] = None) ->
     logr.info(f"VCS update git: {gh_cfg.repo}")
 
     ghr = git_runner(gh_cfg, repo_dir)
-
     if not tag_name:
         tag_name = tag_name_timestamp()
 
@@ -260,4 +259,7 @@ def git_runner(gh_cfg: GitSpec, repo_dir: Path) -> GitRunner:
         else:
             return GitSecuredDeployKeyRunner(gh_cfg, repo_dir)
 
-    raise RuntimeError("Git config missing authentication settings")
+    # Note: this is unreachable code since the config-model validation should
+    # have ensured the proper fields exist in the spec.
+
+    raise RuntimeError("Git config missing authentication settings")  # pragma: no cover
