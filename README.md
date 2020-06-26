@@ -15,7 +15,7 @@ configurations that are monolithic in nature.  That is to say the entire
 configuration can be captured using a command such as "show running-config".  Any
 NOS that provides a monolithic configuration should be supported by `netcfgbu`.
 
-**Primary Considerations**    
+**Primary Considerations**
 * I have a multi-vendor environment. I need to account for the different commands
 that are used to obtain the running configuration and disable paging if
 required.
@@ -37,7 +37,7 @@ advantage of any and all techniques that reduce the total amount of time.
 The general approach to `netcfgbu` is a configuration based methodology so as
 to not hardcode the tool to work with specific network device drivers
 and avoid the complexity and dependency of including a collection of 3rd-party
-libraries specific to network devices.  
+libraries specific to network devices.
 
 Read the Documenttion [here](docs/TOC.md).<br/>
 Read the Quick Start [here](docs/QuickStart.md)<br/>
@@ -82,16 +82,16 @@ Commands:
 
 # Setup
 
-The `netcfgbu` tool requires you to setup a
-[TOML](https://github.com/toml-lang/toml)
-[configuration](docs/configuration-file.md) file, by default is called
-`netcfgbu.toml` and is searched for in the current working directory. You can
-override this location using the `-C <filepath>` option or using the
+The `netcfgbu` tool does not require you to create a configuration file, but
+for practical purposes you will generally need one.  The file is
+[TOML](https://github.com/toml-lang/toml) format.  The default file is
+`netcfgbu.toml` and `netcfgbu` searches for in the current working directory.
+You can override this location using the `-C <filepath>` option or using the
 environment variable `NETCFGBU_CONFIG`
 
-At a minimum you need to designate the [inventory](docs/inventory.md) file and
+At a minimum you need to designate the [inventory](docs/inventory.md) CSV file and
 a default set of SSH login credentials.  The network device configs will be
-stored in the current working directory, or as specified in the `configs_dir`
+stored in the current working directory, or as specified in the `defaults.configs_dir`
 option.  The configuration-file supports the use of environment variables.
 
 Example:
@@ -103,10 +103,26 @@ Example:
     credentials.password = "$NETWORK_PASSWORD"
 ```
 
+The `netcfgbu` defines the use of specific [Environment Variables](docs/environment_variables.md).  Their
+use is the equivalent of the following configuration file.  That is to say, if you did not provide `netcfgbu` a
+configuration file, this would be used:
+
+```toml
+[defaults]
+    inventory = "$NETCFBU_INVENTORY"
+    configs_dir = "$NETCFGBU_CONFIGSDIR"
+    credentials.username = "$NETCFGBU_DEFAULT_USERNAME"
+    credentials.password = "$NETCFGBU_DEFAULT_PASSWORD"
+```
+
 ### System Requirements and Installation
 
-This tool requires the use of Python3.8.  You will need to git-clone this repository
-and run `python setup.py` to install it into your environment.
+This tool requires the use of Python3.8.<br/>
+Installation available via PyPI:
+
+```shell script
+$ pip install netcfgbu
+```
 
 ### Questions or Suggestions?
 

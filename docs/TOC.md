@@ -9,13 +9,14 @@
   * [OS Specific Backup Options](config-ospec.md)
   * [Credentials](config-credentials.md)
   * [Git](config-vcs-git.md)
+  * [SSH Jumphost Support](config-ssh-jumphost.md)
   * [SSH Config Options](config-ssh-options.md)
-  
+
 * [Inventory](inventory.md)
   * [File Definition](inventory.md#inventory-file)
   * [Integration Scripts](configuration-file.md#inventory-scripts)
 
-* Command Usages  
+* Command Usages
   * [General Commands](commands.md)
   * [Filtering](usage-filtering.md)
   * [Gitub Commands](usage-vcs.md)
@@ -24,4 +25,4 @@
 
 * [Environment Variables](environment_variables.md)
 
-* [OS Custom Connectors](custom-connectors.md)  
+* [OS Custom Connectors](custom-connectors.md)

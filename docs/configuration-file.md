@@ -28,7 +28,7 @@ in the example below.  All of these defaults also support the use
 of `NETCFGBU_` environment variables as described [here](environment_variables.md).
 
 **`inventory`**<br/>
-File path to the inventory CSV. 
+File path to the inventory CSV.
 
 **`credentials.username`**<br/>
 The default login user-name
@@ -59,5 +59,5 @@ To enable logging you can defined the `[logging]` section in the configuration
 file. The format of this section is the standard Python logging module, as
 documented [here]( https://docs.python.org/3/library/logging.config.html).
 
-The logger name for `netcfgbu` is "netcfgbu".  
+The logger name for `netcfgbu` is "netcfgbu".
 See the [sample netcfgbu.toml](../netcfgbu.toml) for further details.

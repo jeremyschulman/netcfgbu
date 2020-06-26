@@ -1,7 +1,7 @@
 # SSH Config Options
 You may need to provide SSH configuration options such as Key Exchange or
 Cipher options.  The `netcfgbu` tool uses [AsyncSSH](https://github.com/ronf/asyncssh) as an underlying transport.
-You can provide any SSH Configuration option supported by AsyncSSH either at 
+You can provide any SSH Configuration option supported by AsyncSSH either at
 the global level or at the OS-spec level.
 
 For example at the global level:

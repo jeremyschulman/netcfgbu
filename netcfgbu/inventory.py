@@ -10,13 +10,9 @@ from .config_model import AppConfig, InventorySpec
 
 def load(app_cfg: AppConfig, limits=None, excludes=None):
 
-    try:
-        inventory_file = Path(app_cfg.defaults.inventory)
-    except KeyError:
-        raise RuntimeError("No inventory provided")
-
+    inventory_file = Path(app_cfg.defaults.inventory)
     if not inventory_file.exists():
-        raise RuntimeError(
+        raise FileNotFoundError(
             f"Inventory file does not exist: {inventory_file.absolute()}"
         )
 
@@ -36,14 +32,13 @@ def load(app_cfg: AppConfig, limits=None, excludes=None):
     return list(iter_recs)
 
 
-def build(inv_def: InventorySpec):
+def build(inv_def: InventorySpec) -> int:
     lgr = get_logger()
 
-    if not (script := inv_def.script):
-        lgr.warning("No script defined for this inventory")
-        return
+    # the script field is required so therefore it exists from
+    # config-load-validation.
 
-    # script = expandvars(script)
+    script = inv_def.script
     lgr.info(f"Executing script: [{script}]")
 
     # Note: if you want to check the pass/fail of this call os.system() will
@@ -51,4 +46,8 @@ def build(inv_def: InventorySpec):
     # is no exception handling.  If you want to do exception handling, then
     # you'll need to use subprocess.call in place of os.system.
 
-    os.system(script)
+    rc = os.system(script)
+    if rc != 0:
+        lgr.warning(f"inventory script returned non-zero return code: {rc}")
+
+    return rc

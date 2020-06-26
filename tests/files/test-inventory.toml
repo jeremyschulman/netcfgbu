@@ -1,0 +1,3 @@
+[[inventory]]
+    name = 'netbox'
+    script = "${SCRIPT_DIR}/do-nothing.sh"

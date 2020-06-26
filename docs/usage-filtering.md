@@ -2,7 +2,7 @@
 
 This page describes how you can filter the inventory file so that only the
 desired items are used in the execution of a command.  There are two methods
-for filtering records: by field-name(s) and by file-contents.  
+for filtering records: by field-name(s) and by file-contents.
 
 Use the `--limit` option to include only those items that match on the filter criteria.
 Use the `--exclude` option to exclude inventory items based on the filter criteria.
@@ -37,21 +37,12 @@ $ netcfgbu backup --limit 'os_name=iosxe|nxos' --limit 'host=.*mycorp.com'
 ```
 
 
-## Filter by File Contents
-If the filter expression begins with an at-symbol (@), then the contents of the file
-are used to filter the inventory.  You can use either CSV files or plain-text files.
-In both cases any line that begins with a hash (#) will be ignored.
+## Filter by CSV File Contents
+If the filter expression begins with an at-symbol (@), then the contents of the
+file are used to filter the inventory.  Any line that begins with a hash (#)
+will be ignored.  The CSV file must contain the `host` column-field.
 
 Example:
 ```shell script
 $ netcfgbu backup --exclude @failures.csv
 ```
-
-### CSV Files
-When using a CSV file, you must ensure the file extension is `.csv` and that the first
-line includes a field-header row with a `host` column. 
-
-### Plain-Text Files
-When using a plain-text file the first word on each line will be used as the host value
-for filtering purposes.
-

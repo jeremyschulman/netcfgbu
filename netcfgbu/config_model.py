@@ -12,6 +12,7 @@ from pydantic import (
     PositiveInt,
     Field,
     validator,
+    root_validator,
 )
 
 
@@ -24,6 +25,7 @@ __all__ = [
     "OSNameSpec",
     "LinterSpec",
     "GitSpec",
+    "JumphostSpec",
 ]
 
 _var_re = re.compile(
@@ -120,6 +122,24 @@ class GitSpec(NoExtraBaseModel):
             )
         return repo
 
+    @root_validator
+    def enure_proper_auth(cls, values):
+        req = ("token", "deploy_key", "password")
+        auth_vals = list(filter(None, (values.get(auth) for auth in req)))
+        auth_c = len(auth_vals)
+        if not auth_c:
+            raise ValueError(
+                f'Missing one of required auth method fields: {"|".join(req)}'
+            )
+
+        if auth_c > 1:
+            raise ValueError(f'Only one of {"|".join(req)} allowed')
+
+        if values.get("deploy_passphrase") and not values.get("deploy_key"):
+            raise ValueError("deploy_key required when using deploy_passphrase")
+
+        return values
+
 
 class OSNameSpec(NoExtraBaseModel):
     credentials: Optional[List[Credential]]
@@ -152,6 +172,18 @@ class InventorySpec(NoExtraBaseModel):
         return script_exec
 
 
+class JumphostSpec(NoExtraBaseModel):
+    proxy: str
+    name: Optional[str]
+    include: Optional[List[str]]
+    exclude: Optional[List[str]]
+    timeout: PositiveInt = Field(consts.DEFAULT_LOGIN_TIMEOUT)
+
+    @validator("name", always=True)
+    def _default_name(cls, value, values):  # noqa
+        return values["proxy"] if not value else value
+
+
 class AppConfig(NoExtraBaseModel):
     defaults: Defaults
     credentials: Optional[List[Credential]]
@@ -161,10 +193,11 @@ class AppConfig(NoExtraBaseModel):
     logging: Optional[Dict]
     ssh_configs: Optional[Dict]
     git: Optional[List[GitSpec]]
+    jumphost: Optional[List[JumphostSpec]]
 
     @validator("os_name")
     def _linters(cls, v, values):  # noqa
-        linters = values.get('linters') or {}
+        linters = values.get("linters") or {}
         for os_name, os_spec in v.items():
             if os_spec.linter and os_spec.linter not in linters:
                 raise ValueError(

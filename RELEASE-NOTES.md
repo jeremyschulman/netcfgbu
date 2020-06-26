@@ -1,5 +1,13 @@
 # Release Notes
 
+#### v0.5.0
+   * BREAKING Change: removed support of non-CSV files for filtering "@<file>".  Only
+   CSV files are currently supported.
+   * Addes support for SSH jumphost proxy, see [Using Jumphosts](docs/config-ssh-jumphost.md)
+   * Added CI/CD tooling - tox & friends, github actions, pre-commit
+   * Added unit-test coverage for full infrastructure components; that is
+   everything but the CLI.
+
 #### v0.4.0 (2020-Jun-21)
    * BREAKING Change `[[github]]` to `[[git]]` in `netcfgby.toml`
    * BREAKING Change subcommand `inventory ls` to `inventory list`
@@ -8,13 +16,13 @@
 
 #### v0.3.1 (2020-Jun-17)
    * Bugfix resulting in missing `os_name` config
-   
+
 #### v0.3.0 (2020-Jun-12)
    * Add support for Github version control system
    * Add config file validation
    * Add support for user-defined inventory columns
    * Enhanced netbox integration script to work with >= version 2.7
-   
+
 #### v0.2.0 (2020-Jun-09)
    * Add Quick-Start docs
    * Add Netbox Integration docs

@@ -16,6 +16,17 @@
 
 # -----------------------------------------------------------------------------
 #
+#                          Jumphosts
+#
+# -----------------------------------------------------------------------------
+
+#[[jumphost]]
+#    proxy = "jschulman@my-dc1.com"
+#    include = ['hosts=.*\.dc1']
+#    exclude = ['os_name=asa']
+
+# -----------------------------------------------------------------------------
+#
 #                          Version Control System(s)
 #
 # Currently only git systems are supported, but others types may be

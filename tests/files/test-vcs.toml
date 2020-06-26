@@ -1,0 +1,7 @@
+[[git]]
+    repo = 'git@dummy.git'
+    token = "$GIT_TOKEN"
+
+#[[git]]
+#    repo = 'git@dummy-keyfile.git'
+#    deploy_key = "$GIT_DEPLOY_KEYFILE"

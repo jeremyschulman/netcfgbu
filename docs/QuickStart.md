@@ -19,7 +19,7 @@ you can run:
 
 ```shell script
 $ netcfgbu probe
-``` 
+```
 
 When the command completes you will see a report similar:
 ```shell script

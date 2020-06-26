@@ -1,0 +1,9 @@
+[tool.black]
+target-version = ['py38']
+
+[tool.interrogate]
+    fail-under = 0
+    verbose = 1
+    color = true
+    ignore-module = true
+    exclude = ["setup.py", "tasks.py", "bin"]

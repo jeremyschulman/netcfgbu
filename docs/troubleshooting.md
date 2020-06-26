@@ -24,7 +24,7 @@ Change the `file descriptors` value to a larger value, for example 4096:
 
 ```shell script
 $ ulimit -n 4096
-``` 
+```
 
 #### Unable to SSH due to mismatch SSH-configs
 
@@ -55,4 +55,4 @@ Using the information provded update your configuration file to include the requ
 exchange settings, either in the global `[ssh_configs]` section or in the `[os_name.$name.ssh_configs] section.
 There is an example of such a configuration is the sample [netcfgbu.toml](../netcfgbu.toml).
 
-For addition information refer to the [SSH-config options](config-ssh-options.md) documentation page. 
+For addition information refer to the [SSH-config options](config-ssh-options.md) documentation page.

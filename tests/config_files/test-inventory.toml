@@ -1,5 +1,0 @@
-[[inventory]]
-    name = 'netbox'
-    script = '''netbox/netbox_inventory.py \
-        --exclude-tag no-backup --exclude-tag no-ssh \
-        --output inventory.csv'''

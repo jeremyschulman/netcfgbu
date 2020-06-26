@@ -1,0 +1,4 @@
+[run]
+# include = */netcfgbu/*
+omit =
+    netcfgbu/logger*

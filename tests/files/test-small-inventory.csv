@@ -1,0 +1,5 @@
+host,os_name
+switch1,eos
+switch2,eos
+switch3,ios
+switch4,nxos

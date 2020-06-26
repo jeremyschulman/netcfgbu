@@ -4,6 +4,7 @@ This file contains the filtering functions that are using to process the
 not specific to the netcfgbu inventory column names, can could be re-used for
 other CSV related tools and use-cases.
 """
+from typing import List, AnyStr, Optional, Callable, Dict
 import re
 import operator
 from pathlib import Path
@@ -40,25 +41,19 @@ def create_filter_function(op_filters, optest_fn):
     return filter_fn
 
 
-def mk_file_filter(filepath):
+def mk_file_filter(filepath, key):
 
     if filepath.endswith(".csv"):
-        filter_hostnames = [rec["host"] for rec in CommentedCsvReader(open(filepath))]
-
+        filter_hostnames = [rec[key] for rec in CommentedCsvReader(open(filepath))]
     else:
-        filter_hostnames = list()
-        with open(filepath) as infile:
-            for line_item in infile.readlines():
-                if line_item.startswith("#"):
-                    continue
-                host = iter(next(wordsep_re.split(line_item), None))
-                if not host:
-                    continue
-                filter_hostnames.append(host)
+        raise ValueError(
+            f"File '{filepath}' not a CSV file.  Only CSV files are supported at this time"
+        )
 
     def op_filter(rec):
-        return rec["host"] in filter_hostnames
+        return rec[key] in filter_hostnames
 
+    op_filter.hostnames = filter_hostnames
     op_filter.__doc__ = f"file: {filepath})"
     op_filter.__name__ = op_filter.__doc__
     op_filter.__qualname__ = op_filter.__doc__
@@ -66,7 +61,35 @@ def mk_file_filter(filepath):
     return op_filter
 
 
-def create_filter(constraints, field_names, include=True):
+def create_filter(
+    constraints: List[AnyStr], field_names: List[AnyStr], include: Optional[bool] = True
+) -> Callable[[Dict], bool]:
+    """
+    This function returns a function that is used to filter inventory records.
+
+    Parameters
+    ----------
+    constraints:
+        A list of contraint expressions that are in the form "<field-name>=<value>".
+
+    field_names:
+        A list of known field names
+
+    include:
+        When True, the filter function will match when the constraint is true,
+        for example if the contraint is "os_name=eos", then it would match
+        records that have os_name field euqal to "eos".
+
+        When False, the filter function will match when the constraint is not
+        true. For exampl if the constraint is "os_name=eos", then the filter
+        function would match recoreds that have os_name fields not equal to
+        "eos".
+
+    Returns
+    -------
+    The returning filter function expects an inventory record as the single
+    input parameter, and the function returns True/False on match.
+    """
     fieldn_pattern = "^(?P<keyword>" + "|".join(fieldn for fieldn in field_names) + ")"
     field_value_reg = re.compile(fieldn_pattern + "=" + value_pattern)
 
@@ -79,8 +102,15 @@ def create_filter(constraints, field_names, include=True):
             filepath = mo.group(1)
             if not Path(filepath).exists():
                 raise FileNotFoundError(filepath)
-            op_filters.append(mk_file_filter(filepath))
-            continue
+
+            try:
+                op_filters.append(mk_file_filter(filepath, key="host"))
+                continue
+
+            except KeyError:
+                raise ValueError(
+                    f"File '{filepath}' does not contain host content as expected"
+                )
 
         # next check for keyword=value filtering use-case
 
@@ -93,7 +123,9 @@ def create_filter(constraints, field_names, include=True):
             value_reg = re.compile(f"^{value}$", re.IGNORECASE)
 
         except re.error as exc:
-            raise ValueError(f"Invalid filter expression: {filter_expr}: {str(exc)}")
+            raise ValueError(
+                f"Invalid filter regular-expression: {filter_expr}: {str(exc)}"
+            )
 
         op_filters.append(mk_op_filter(value_reg, fieldn))
 

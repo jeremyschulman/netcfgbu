@@ -5,6 +5,7 @@ import click
 from netcfgbu.os_specs import make_host_connector
 from netcfgbu.logger import get_logger, stop_aiologging
 from netcfgbu.aiofut import as_completed
+from netcfgbu import jumphosts
 
 from .root import (
     cli,
@@ -34,6 +35,10 @@ def exec_backup(app_cfg, inventory_recs):
 
     async def process_batch():
         nonlocal done
+
+        if app_cfg.jumphost:
+            await jumphosts.connect_jumphosts()
+
         async for task in as_completed(backup_tasks):
             done += 1
             coro = task.get_coro()

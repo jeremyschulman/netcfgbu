@@ -11,19 +11,12 @@
 
 from invoke import task
 
-PYTHON_PATHS = [
-    'netcfgbu/',
-    'bin/netcfgbu',
-    'netbox/*.py',
-    'tests/*.py'
-]
-
 
 @task
-def lint(ctx):
-    for each in PYTHON_PATHS:
-        ctx.run(f"black {each}")
-        ctx.run(f"flake8 {each}")
+def precheck(ctx):
+    ctx.run("black .")
+    ctx.run("flake8 .")
+    ctx.run("interrogate -c pyproject.toml --exclude=build", pty=True)
 
 
 @task
@@ -32,4 +25,3 @@ def clean(ctx):
     ctx.run("rm -rf netcfgbu.egg-info")
     ctx.run("rm -rf .pytest_cache .pytest_tmpdir")
     ctx.run("rm -rf htmlcov")
-
