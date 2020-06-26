@@ -23,4 +23,4 @@ jobs:
     - name: install tox and friends
       run: python -m pip install --upgrade pip setuptools tox virtualenv
     - name: run tox
-      run: tox -e py
+      run: tox
