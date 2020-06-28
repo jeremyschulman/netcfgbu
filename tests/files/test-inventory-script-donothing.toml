@@ -1,2 +1,10 @@
+[[jumphost]]
+    proxy = "1.2.3.4"
+    include = ['os_name=.*']
+
 [[inventory]]
+    script = "${SCRIPT_DIR}/do-nothing.sh"
+
+[[inventory]]
+    name = 'dummy'
     script = "${SCRIPT_DIR}/do-nothing.sh"

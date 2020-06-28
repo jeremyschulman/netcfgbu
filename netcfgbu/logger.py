@@ -67,8 +67,7 @@ def setup_logging(app_cfg):
     log_cfg["version"] = 1
 
     dictConfig(log_cfg)
-    if "loggers" in log_cfg:
-        setup_logging_queue(log_cfg["loggers"])
+    setup_logging_queue(log_cfg.get("loggers") or [])
 
 
 def stop_aiologging():

@@ -10,6 +10,7 @@ from pydantic import (
     SecretStr,
     BaseSettings,
     PositiveInt,
+    FilePath,
     Field,
     validator,
     root_validator,
@@ -103,6 +104,15 @@ class Defaults(NoExtraBaseModel, BaseSettings):
         return Path(value).absolute()
 
 
+class FilePathEnvExpand(FilePath):
+    """ A FilePath field whose value can interpolated from env vars """
+
+    @classmethod
+    def __get_validators__(cls):
+        yield from EnvExpand.__get_validators__()
+        yield from FilePath.__get_validators__()
+
+
 class GitSpec(NoExtraBaseModel):
     name: Optional[str]
     repo: str
@@ -110,7 +120,7 @@ class GitSpec(NoExtraBaseModel):
     username: Optional[EnvExpand]
     password: Optional[EnvExpand]
     token: Optional[EnvSecretStr]
-    deploy_key: Optional[EnvExpand]
+    deploy_key: Optional[FilePathEnvExpand]
     deploy_passphrase: Optional[EnvSecretStr]
 
     @validator("repo")

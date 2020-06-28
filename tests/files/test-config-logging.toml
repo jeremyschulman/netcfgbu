@@ -1,0 +1,16 @@
+[logging.loggers.netcfgbu]
+    handlers = ["console", "file"]
+    level = "INFO"
+
+[logging.handlers.console]
+    class = "logging.StreamHandler"
+    formatter = "basic"
+    stream = "ext://sys.stdout"
+
+[logging.handlers.file]
+    class = "logging.FileHandler"
+    formatter = "basic"
+    filename =  "/tmp/netcfgbu.log"
+
+[logging.formatters.basic]
+    format = "%(asctime)s %(levelname)s: %(message)s"

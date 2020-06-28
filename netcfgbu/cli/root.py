@@ -1,6 +1,5 @@
-import sys
 from importlib import metadata
-
+from pathlib import Path
 
 import click
 from functools import reduce
@@ -26,11 +25,10 @@ class WithConfigCommand(click.Command):
     def invoke(self, ctx):
         try:
             ctx.obj["app_cfg"] = _config.load(fileio=ctx.params["config"])
+            super().invoke(ctx)
 
         except Exception as exc:
-            ctx.fail(exc.args[0])
-
-        super().invoke(ctx)
+            ctx.fail(str(exc))
 
 
 class WithInventoryCommand(click.Command):
@@ -39,7 +37,7 @@ class WithInventoryCommand(click.Command):
         try:
             app_cfg = ctx.obj["app_cfg"] = _config.load(fileio=ctx.params["config"])
 
-            if debug_ssh_lvl := ctx.params.get("debug_ssh"):
+            if debug_ssh_lvl := ctx.params.get("debug_ssh"):  # pragma: no cover
                 from asyncssh import logging as assh_lgr
                 import logging
 
@@ -55,24 +53,19 @@ class WithInventoryCommand(click.Command):
                 excludes=ctx.params["exclude"],
             )
 
+            if not inv:
+                raise RuntimeError(
+                    f"No inventory matching limits in: {app_cfg.defaults.inventory}"
+                )
+
             # if there is jump host configuraiton then prepare for later use.
             if app_cfg.jumphost:
                 jumphosts.init_jumphosts(jumphost_specs=app_cfg.jumphost, inventory=inv)
 
-        except FileNotFoundError as exc:
-            sys.exit(f"File not found: {exc.filename}")
-
-        except (ValueError, RuntimeError) as exc:
-            ctx.fail(f"{exc.args[0]}")
-
-        if not ctx.obj["inventory_recs"]:
-            sys.exit(f"No inventory matching limits in: {app_cfg.defaults.inventory}")
-
-        try:
             super().invoke(ctx)
 
-        except RuntimeError as exc:
-            sys.exit(exc)
+        except Exception as exc:
+            ctx.fail(str(exc))
 
 
 # -----------------------------------------------------------------------------
@@ -83,10 +76,20 @@ class WithInventoryCommand(click.Command):
 
 
 def get_spec_nameorfirst(spec_list, spec_name=None):
+    if not spec_list:
+        return None
+
     if not spec_name:
         return first(spec_list)
 
     return first(spec for spec in spec_list if getattr(spec, "name", "") == spec_name)
+
+
+def check_for_default(ctx, opt, value):
+    if value or Path("netcfgbu.toml").exists():
+        return value
+
+    return None
 
 
 opt_config_file = click.option(
@@ -94,8 +97,9 @@ opt_config_file = click.option(
     "--config",
     envvar="NETCFGBU_CONFIG",
     type=click.File(),
-    required=True,
-    default="netcfgbu.toml",
+    callback=check_for_default
+    # required=True,
+    # default="netcfgbu.toml",
 )
 
 # -----------------------------------------------------------------------------
@@ -140,4 +144,4 @@ opt_debug_ssh = click.option(
 @click.group()
 @click.version_option(version=VERSION)
 def cli():
-    pass
+    pass  # pragma: no cover

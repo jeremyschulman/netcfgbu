@@ -84,25 +84,25 @@ def vcs_save(gh_cfg: GitSpec, repo_dir: Path, tag_name: Optional[str] = None) ->
     return True
 
 
-def vcs_prepare(gh_cfg: GitSpec, repo_dir: Path):
+def vcs_prepare(spec: GitSpec, repo_dir: Path):
     logr = get_logger()
-    logr.info(f"VCS prepare git: {gh_cfg.repo}")
+    logr.info(f"VCS prepare git: {spec.repo}")
 
-    ghr = git_runner(gh_cfg, repo_dir)
+    ghr = git_runner(spec, repo_dir)
     ghr.git_init()
     ghr.git_pull()
 
 
-def vcs_status(gh_cfg: GitSpec, repo_dir: Path):
+def vcs_status(spec: GitSpec, repo_dir: Path):
     logr = get_logger()
     logr.info(
         f"""
-VCS diffs git: {gh_cfg.repo}
+VCS diffs git: {spec.repo}
              dir: {str(repo_dir)}
 """
     )
 
-    ghr = git_runner(gh_cfg, repo_dir)
+    ghr = git_runner(spec, repo_dir)
     return ghr.run("status")
 
 

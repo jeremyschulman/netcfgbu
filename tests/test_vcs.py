@@ -27,7 +27,7 @@ def test_vcs_pass_prepare_token(mock_pexpect, tmpdir, monkeypatch):
     git_cfg = config_model.GitSpec(repo="git@dummy.git", token="dummy-token")
     repo_dir = tmpdir.join("repo")
 
-    git.vcs_prepare(gh_cfg=git_cfg, repo_dir=Path(repo_dir))
+    git.vcs_prepare(spec=git_cfg, repo_dir=Path(repo_dir))
 
     mock_run = mock_pexpect.run
     assert mock_run.called
@@ -50,13 +50,13 @@ def test_vcs_pass_prepare_token(mock_pexpect, tmpdir, monkeypatch):
 def test_vcs_pass_prepare_deploykey(mock_pexpect, tmpdir, monkeypatch):
     monkeypatch.setenv("USER", "dummy-user")
 
-    key_file = str(tmpdir.join("dummy-keyfile"))
-
-    git_cfg = config_model.GitSpec(repo="git@dummy.git", deploy_key=key_file)
+    key_file = tmpdir.join("dummy-keyfile")
+    key_file.ensure()
+    git_cfg = config_model.GitSpec(repo="git@dummy.git", deploy_key=str(key_file))
 
     repo_dir = tmpdir.join("repo")
 
-    git.vcs_prepare(gh_cfg=git_cfg, repo_dir=Path(repo_dir))
+    git.vcs_prepare(spec=git_cfg, repo_dir=Path(repo_dir))
 
     mock_run = mock_pexpect.run
     assert mock_run.called
@@ -80,7 +80,9 @@ def test_vcs_pass_prepare_deploykey(mock_pexpect, tmpdir, monkeypatch):
 def test_vcs_pass_prepare_deploykey_passphrase(mock_pexpect, tmpdir, monkeypatch):
     monkeypatch.setenv("USER", "dummy-user")
 
-    key_file = str(tmpdir.join("dummy-keyfile"))
+    key_file = tmpdir.join("dummy-keyfile")
+    key_file.ensure()
+    key_file = str(key_file)
 
     git_cfg = config_model.GitSpec(
         repo="git@dummy.git",
@@ -90,7 +92,7 @@ def test_vcs_pass_prepare_deploykey_passphrase(mock_pexpect, tmpdir, monkeypatch
 
     repo_dir = tmpdir.join("repo")
 
-    git.vcs_prepare(gh_cfg=git_cfg, repo_dir=Path(repo_dir))
+    git.vcs_prepare(spec=git_cfg, repo_dir=Path(repo_dir))
 
     mock_run = mock_pexpect.run
     assert mock_run.called
@@ -169,7 +171,7 @@ def test_vcs_pass_status(monkeypatch, tmpdir, mock_pexpect):
     repo_dir = tmpdir.join("repo")
 
     mock_pexpect.run.return_value = ("nothing to commit", 0)
-    result = git.vcs_status(gh_cfg=git_cfg, repo_dir=Path(repo_dir))
+    result = git.vcs_status(spec=git_cfg, repo_dir=Path(repo_dir))
     assert result == "nothing to commit"
 
 

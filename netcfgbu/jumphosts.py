@@ -180,8 +180,9 @@ async def connect_jumphosts():
             await jh.connect()
             log.info(f"JUMPHOST: connected to {jh.name}")
 
-        except asyncssh.Error as exc:
-            log.error(f"JUMPHOST: connect to {jh.name} failed: {str(exc)}")
+        except (asyncio.TimeoutError, asyncssh.Error) as exc:
+            errmsg = str(exc) or exc.__class__.__name__
+            log.error(f"JUMPHOST: connect to {jh.name} failed: {errmsg}")
             ok = False
 
     return ok
