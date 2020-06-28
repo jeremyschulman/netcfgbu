@@ -16,12 +16,13 @@ from invoke import task
 def precheck(ctx):
     ctx.run("black .")
     ctx.run("flake8 .")
-    ctx.run("interrogate -c pyproject.toml --exclude=build", pty=True)
+    ctx.run("pre-commit run -a")
+    ctx.run("interrogate -c pyproject.toml --exclude=build --exclude tests", pty=True)
 
 
 @task
 def clean(ctx):
     ctx.run("python setup.py clean")
     ctx.run("rm -rf netcfgbu.egg-info")
-    ctx.run("rm -rf .pytest_cache .pytest_tmpdir")
+    ctx.run("rm -rf .pytest_cache .pytest_tmpdir .coverage")
     ctx.run("rm -rf htmlcov")

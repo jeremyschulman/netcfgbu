@@ -1,4 +1,3 @@
-import sys
 from collections import Counter
 from operator import itemgetter
 from textwrap import indent
@@ -7,6 +6,7 @@ import click
 from tabulate import tabulate
 
 from netcfgbu.config_model import AppConfig
+from netcfgbu.inventory import build
 
 from .root import (
     cli,
@@ -30,7 +30,7 @@ def cli_inventory():
     """
     Inventory subcommands.
     """
-    pass
+    pass  # pragma: no cover
 
 
 @cli_inventory.command("list", cls=WithInventoryCommand)
@@ -60,7 +60,7 @@ SUMMARY: TOTAL={len(inventory_recs)}
     )
 
     if cli_opts["brief"] is True:
-        return
+        return  # pragma: no cover
 
     field_names = inventory_recs[0].keys()
 
@@ -83,12 +83,18 @@ def cli_inventory_build(ctx, **cli_opts):
     If the netcfgbu configuraiton file contains inventory definitions then you
     can use this command to the script to build the inventory.
     """
-    from netcfgbu.inventory import build
 
     app_cfg: AppConfig = ctx.obj["app_cfg"]
 
     if not (spec := get_spec_nameorfirst(app_cfg.inventory, cli_opts["name"])):
-        cfgfile = ctx.params["config"].name
-        sys.exit(f"Inventory not defined in configuration file: {cfgfile}")
+        cfg_opt = ctx.params["config"]
+        inv_name = cli_opts["name"]
+        inv_name = f"'{inv_name}'" if inv_name else ""
+        err_msg = (
+            f"Inventory section {inv_name} not defined in configuration file: {cfg_opt.name}"
+            if cfg_opt
+            else "Configuration file required for use with build subcommand"
+        )
+        raise RuntimeError(err_msg)
 
     build(spec)

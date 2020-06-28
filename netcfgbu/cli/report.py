@@ -54,7 +54,7 @@ class Report(object):
 
     def print_report(self):
         if not self.stop_tm:
-            self.stop_timing()
+            self.stop_timing()  # pragma: no cover
 
         fail_n = len(self.task_results[False])
         ok_n = len(self.task_results[True])

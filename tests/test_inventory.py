@@ -17,7 +17,7 @@ def test_inventory_pass(request, monkeypatch, netcfgbu_envars):
 
     # all records
     inv_recs = inventory.load(app_cfg)
-    assert len(inv_recs) == 4
+    assert len(inv_recs) == 6
 
     # filter records
     inv_recs = inventory.load(

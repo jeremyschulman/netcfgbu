@@ -1,10 +1,6 @@
-import sys
-
-
 import click
 
 from netcfgbu import config as _config
-from netcfgbu.config_model import AppConfig
 from netcfgbu.vcs import git
 from netcfgbu.logger import stop_aiologging
 
@@ -18,31 +14,36 @@ def cli_vcs():
     """
     Version Control System subcommands.
     """
-    pass
+    pass  # pragma: no cover
 
 
 class VCSCommand(click.Command):
     def invoke(self, ctx):
+        cfg_fileopt = ctx.params["config"]
+
         try:
-            app_cfgs = ctx.obj["app_cfg"] = _config.load(fileio=ctx.params["config"])
+            app_cfgs = ctx.obj["app_cfg"] = _config.load(fileio=cfg_fileopt)
             if not (spec := get_spec_nameorfirst(app_cfgs.git, ctx.params["name"])):
-                cfgfile = ctx.params["config"].name
-                sys.exit(f"No VCS found, check configuration file: {cfgfile}")
+                err_msg = (
+                    "No configuration file provided, required for vcs support"
+                    if not cfg_fileopt
+                    else f"No vcs config section found in configuration file: {cfg_fileopt.name}"
+                )
+                raise RuntimeError(err_msg)
 
             ctx.obj["vcs_spec"] = spec
+            super().invoke(ctx)
+            stop_aiologging()
 
         except Exception as exc:
             ctx.fail(exc.args[0])
-
-        super().invoke(ctx)
-        stop_aiologging()
 
 
 @cli_vcs.command(name="prepare", cls=VCSCommand)
 @opt_config_file
 @opt_vcs_name
 @click.pass_context
-def cli_vcs_setup(ctx, **_cli_opts):
+def cli_vcs_prepare(ctx, **_cli_opts):
     """
     Prepare your system with the VCS repo.
 
@@ -51,8 +52,9 @@ def cli_vcs_setup(ctx, **_cli_opts):
     can be stored in the VCS system.
     """
 
-    app_cfgs: AppConfig = ctx.obj["app_cfg"]
-    git.vcs_prepare(ctx.obj["vcs_spec"], repo_dir=app_cfgs.defaults.configs_dir)
+    git.vcs_prepare(
+        spec=ctx.obj["vcs_spec"], repo_dir=ctx.obj["app_cfg"].defaults.configs_dir
+    )
 
 
 @cli_vcs.command(name="save", cls=VCSCommand)
@@ -60,7 +62,7 @@ def cli_vcs_setup(ctx, **_cli_opts):
 @opt_vcs_name
 @click.option("--tag-name", help="tag-release name")
 @click.pass_context
-def cli_vcs_get(ctx, **cli_opts):
+def cli_vcs_save(ctx, **cli_opts):
     """
     Save changes into VCS repository.
 
@@ -70,10 +72,9 @@ def cli_vcs_get(ctx, **cli_opts):
     tag by default is the timestamp in the form of
     "<year><month><day>_<hour><minute><second>"
     """
-    app_cfgs: AppConfig = ctx.obj["app_cfg"]
     git.vcs_save(
         ctx.obj["vcs_spec"],
-        repo_dir=app_cfgs.defaults.configs_dir,
+        repo_dir=ctx.obj["app_cfg"].defaults.configs_dir,
         tag_name=cli_opts["tag_name"],
     )
 
@@ -89,6 +90,7 @@ def cli_vcs_status(ctx, **_cli_opts):
     This command will show the status of the `configs_dir` contents so that you
     will know what will be changed before you run the `vcs save` command.
     """
-    app_cfgs: AppConfig = ctx.obj["app_cfg"]
-    output = git.vcs_status(ctx.obj["vcs_spec"], app_cfgs.defaults.configs_dir)
+    output = git.vcs_status(
+        spec=ctx.obj["vcs_spec"], repo_dir=ctx.obj["app_cfg"].defaults.configs_dir
+    )
     print(output)

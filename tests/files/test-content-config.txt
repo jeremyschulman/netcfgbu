@@ -1,0 +1,11 @@
+version 7.1(4)N1(1)
+hostname switch1
+
+no feature telnet
+feature scp-server
+feature tacacs+
+cfs eth distribute
+feature bgp
+feature pim
+feature udld
+

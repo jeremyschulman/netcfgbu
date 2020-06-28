@@ -109,10 +109,11 @@ def test_config_git_pass(request, netcfgbu_envars, monkeypatch):
     """
     Test the case where a [[git]] section is properly configured.
     """
+    files_dir = Path(request.fspath.dirname).joinpath("files")
     monkeypatch.setenv("GIT_TOKEN", "fake-token")
     monkeypatch.setenv("GITKEY_PASSWORD", "fake-password")
-
-    fileio = open(f"{request.fspath.dirname}/files/test-gitspec.toml")
+    monkeypatch.setenv("GITKEY_DIR", str(files_dir.absolute()))
+    fileio = files_dir.joinpath("test-gitspec.toml").open()
     app_cfg = load(fileio=fileio)
 
     assert app_cfg.git[0].token.get_secret_value() == "fake-token"
@@ -256,7 +257,11 @@ def test_config_jumphost_name(netcfgbu_envars, request):
     assert jh.name != jh.proxy
 
 
-def test_vcs_fail_config():
+def test_vcs_fail_config(tmpdir):
+
+    fake_key = tmpdir.join("fake-key")
+    fake_key.ensure()
+    fake_key = str(fake_key)
 
     with pytest.raises(ValidationError) as excinfo:
         config_model.GitSpec(
@@ -273,9 +278,7 @@ def test_vcs_fail_config():
     assert errs[0]["msg"].startswith("Missing one of required auth method fields")
 
     with pytest.raises(ValidationError) as excinfo:
-        config_model.GitSpec(
-            repo="git@dummy.git", token="token", deploy_key="dummy-file"
-        )
+        config_model.GitSpec(repo="git@dummy.git", token="token", deploy_key=fake_key)
 
     errs = excinfo.value.errors()
     assert errs[0]["msg"].startswith("Only one of")
