@@ -1,5 +1,5 @@
 """
-This module contains the probe corutine used to validate that a target device
+This module contains the probe coroutine used to validate that a target device
 has a given port open.
 """
 
