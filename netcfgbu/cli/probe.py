@@ -15,14 +15,15 @@ from .root import (
 )
 
 from .report import Report
+from netcfgbu.consts import DEFAULT_PROBE_TIMEOUT
 
 
 def exec_probe(inventory, timeout=None):
     inv_n = len(inventory)
     log = get_logger()
     log.info(f"Checking SSH reachability on {inv_n} devices ...")
+    timeout = timeout or DEFAULT_PROBE_TIMEOUT
 
-    tasks = dict()
     loop = asyncio.get_event_loop()
 
     tasks = {
@@ -32,12 +33,18 @@ def exec_probe(inventory, timeout=None):
         for rec in inventory
     }
 
+    total = len(tasks)
+    done = 0
     report = Report()
 
     async def proces_check():
+        nonlocal done
+
         async for probe_task in as_completed(tasks):
+            done += 1
             task_coro = probe_task.get_coro()
             rec = tasks[task_coro]
+            msg = f"DONE ({done}/{total}): {rec['host']} "
 
             try:
                 probe_ok = probe_task.result()
@@ -47,7 +54,11 @@ def exec_probe(inventory, timeout=None):
                 probe_ok = False
                 report.task_results[False].append((rec, exc))
 
-            log.info(f"{rec['host']}: probe {'PASS' if probe_ok else 'FAIL'}")
+            except Exception as exc:
+                probe_ok = False
+                log.error(msg + f"FAILURE: {str(exc)}")
+
+            log.info(msg + ("PASS" if probe_ok else "FAIL"))
 
     report.start_timing()
     loop.run_until_complete(proces_check())

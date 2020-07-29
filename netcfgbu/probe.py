@@ -9,7 +9,6 @@ has a given port open.
 
 import asyncio
 
-
 __all__ = ["probe"]
 
 
@@ -20,7 +19,7 @@ __all__ = ["probe"]
 # -----------------------------------------------------------------------------
 
 
-async def probe(host, port=22, timeout=10, raise_exc=False) -> bool:
+async def probe(host, timeout: int, port=22, raise_exc=False) -> bool:
     """
     Coroutine used to determine if a host port is online and available.
 

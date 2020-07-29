@@ -21,12 +21,15 @@ from .root import (
 from .report import Report, err_reason
 from netcfgbu import jumphosts
 from netcfgbu.config_model import AppConfig
+from netcfgbu.consts import DEFAULT_LOGIN_TIMEOUT
 
 
 def exec_test_login(app_cfg: AppConfig, inventory_recs, cli_opts):
 
+    timeout = cli_opts["timeout"] or DEFAULT_LOGIN_TIMEOUT
+
     login_tasks = {
-        make_host_connector(rec, app_cfg).test_login(timeout=cli_opts["timeout"]): rec
+        make_host_connector(rec, app_cfg).test_login(timeout=timeout): rec
         for rec in inventory_recs
     }
 
@@ -50,6 +53,7 @@ def exec_test_login(app_cfg: AppConfig, inventory_recs, cli_opts):
             coro = task.get_coro()
             rec = login_tasks[coro]
             msg = f"DONE ({done}/{total}): {rec['host']} "
+
             try:
                 if login_user := task.result():
                     log.info(msg + f"with user {login_user}")

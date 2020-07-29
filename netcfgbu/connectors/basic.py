@@ -156,7 +156,7 @@ class BasicSSHConnector(object):
     #
     # -------------------------------------------------------------------------
 
-    async def test_login(self, timeout=None) -> Optional[str]:
+    async def test_login(self, timeout: int) -> Optional[str]:
         login_as = None
         self.os_spec.timeout = timeout
 
@@ -299,7 +299,7 @@ class BasicSSHConnector(object):
                 async with self.__class__._max_startups_sem4:
 
                     login_msg = (
-                        f"LOGIN: {self.name} ({self.os_name}) "
+                        f"LOGIN: {self.name} ({self.os_name}) timeout={timeout}s "
                         f"as {self.conn_args['username']}"
                     )
 

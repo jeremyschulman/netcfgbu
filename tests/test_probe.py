@@ -5,6 +5,7 @@ from asynctest import CoroutineMock  # noqa
 import pytest  # noqa
 
 from netcfgbu import probe
+from netcfgbu.consts import DEFAULT_PROBE_TIMEOUT
 
 
 @pytest.mark.asyncio
@@ -16,7 +17,7 @@ async def test_probe_pass(monkeypatch):
     mock_asyncio.wait_for = mock_wait_for
     monkeypatch.setattr(probe, "asyncio", mock_asyncio)
 
-    ok = await probe.probe(host="1.2.3.4")
+    ok = await probe.probe(host="1.2.3.4", timeout=DEFAULT_PROBE_TIMEOUT)
     assert ok is True
 
 
@@ -34,7 +35,7 @@ async def test_probe_pass_timeout(monkeypatch):
     mock_wait_for.side_effect = raises_timeout
     monkeypatch.setattr(probe, "asyncio", mock_asyncio)
 
-    ok = await probe.probe(host="1.2.3.4")
+    ok = await probe.probe(host="1.2.3.4", timeout=DEFAULT_PROBE_TIMEOUT)
     assert ok is False
 
 
@@ -53,4 +54,4 @@ async def test_probe_pass_raises_timeout(monkeypatch):
     monkeypatch.setattr(probe, "asyncio", mock_asyncio)
 
     with pytest.raises(asyncio.TimeoutError):
-        await probe.probe(host="1.2.3.4", raise_exc=True)
+        await probe.probe(host="1.2.3.4", timeout=DEFAULT_PROBE_TIMEOUT, raise_exc=True)

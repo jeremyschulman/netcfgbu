@@ -50,14 +50,16 @@ def exec_backup(app_cfg, inventory_recs):
                 ok = res is True
                 report.task_results[ok].append((rec, res))
 
-            except Exception as exc:
-                import traceback
-
-                traceback.print_exc()
+            except (asyncio.TimeoutError, OSError) as exc:
                 ok = False
                 report.task_results[False].append((rec, exc))
 
-            log.info(msg + "PASS" if ok else "FALSE")
+            except Exception as exc:
+                ok = False
+                log.error(msg + f"FAILURE: {str(exc)}")
+                report.task_results[False].append((rec, exc))
+
+            log.info(msg + ("PASS" if ok else "FALSE"))
 
     loop = asyncio.get_event_loop()
     report.start_timing()
