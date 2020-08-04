@@ -21,8 +21,13 @@
 # -----------------------------------------------------------------------------
 
 #[[jumphost]]
+     # NOTE: your local SSH config file is not used, so make sure you provide
+     # either the IP address of FQDN of the jumphost
+     
 #    proxy = "jschulman@my-dc1.com"
-#    include = ['hosts=.*\.dc1']
+#    include = ['host=.*\.dc1'] 
+     # you MUST provide an include filter. For all devices, use
+     # ['host=.*']
 #    exclude = ['os_name=asa']
 
 # -----------------------------------------------------------------------------
@@ -139,6 +144,8 @@
 #        'diffie-hellman-group14-sha1'
 #    ]
 
+# NOTE: if you do not have these devices in your inventory, delete this section
+# otherwise you will get an error if the environment variables are not defined
     [[os_name.aireos8_10.credentials]]
         username = "$WLC_USERNAME"
         password = "$WLC_PASSWORD"
@@ -154,6 +161,33 @@
     ]
     get_config = "show"
     linter = "panos"
+
+# -----------------------------------------------------------------------------
+# Cumulus Linux
+# -----------------------------------------------------------------------------
+
+[os_name.cumulus]
+    # NOTE: make sure that the user has password-less sudo access, otherwise the
+    # get_config execution will fail. There is no current workaround for this
+    # requirement. Also pre_get_config does not work for Cumulus devices at this time.
+    #
+    # Do not change the order of the cat commands either. This ensures the final
+    # file format is recognized by Batfish (https://github.com/batfish/batfish)
+
+    get_config = "( cat /etc/hostname; cat /etc/network/interfaces; cat /etc/cumulus/ports.conf; sudo cat /etc/frr/frr.conf)"
+
+# -----------------------------------------------------------------------------
+# Juniper JUNOS routers, switches and firewalls
+# -----------------------------------------------------------------------------
+
+[os_name.junos]
+    # NOTE: Do not login as the root user. This will require you to enter CLI mode
+    # prior to getting the configuration, which currently does not work for Juniper
+    # devices.
+
+    get_config = "show configuration | display set"
+    # you can return the configuration in hierarchical format by removing
+    # `| display set` from the command above
 
 # -----------------------------------------------------------------------------
 #                                 Linters
