@@ -9,7 +9,7 @@ section supports the following fields:
      be in the form "[user@]host[:port]". If `user` is not provided, then `$USER`
      from the environment will be used
 
-   * `include` - *(Optional)* A list of [filter](usage-filtering.md) expressions that identify
+   * `include` - A list of [filter](usage-filtering.md) expressions that identify
    which inventory records will be matched to use this jump host
 
    * `exclude` - *(Optional)* A list of [filter](usage-filtering.md) expressions that identify
