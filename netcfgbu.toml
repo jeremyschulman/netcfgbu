@@ -185,6 +185,10 @@
     # prior to getting the configuration, which currently does not work for Juniper
     # devices.
 
+    pre_get_config = [
+        "set cli screen-length 0"
+    ]
+
     get_config = "show configuration | display set"
     # you can return the configuration in hierarchical format by removing
     # `| display set` from the command above
