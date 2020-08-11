@@ -23,9 +23,9 @@
 #[[jumphost]]
      # NOTE: your local SSH config file is not used, so make sure you provide
      # either the IP address of FQDN of the jumphost
-     
+
 #    proxy = "jschulman@my-dc1.com"
-#    include = ['host=.*\.dc1'] 
+#    include = ['host=.*\.dc1']
      # you MUST provide an include filter. For all devices, use
      # ['host=.*']
 #    exclude = ['os_name=asa']
@@ -175,6 +175,9 @@
     # file format is recognized by Batfish (https://github.com/batfish/batfish)
 
     get_config = "( cat /etc/hostname; cat /etc/network/interfaces; cat /etc/cumulus/ports.conf; sudo cat /etc/frr/frr.conf)"
+
+    # example Cumulus prompt value: cumulus@leaf01:mgmt-vrf:~$
+    prompt_pattern = '[a-z0-9.\-@:~]{10,65}\s*[#$]'
 
 # -----------------------------------------------------------------------------
 # Juniper JUNOS routers, switches and firewalls

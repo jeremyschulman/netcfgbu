@@ -1,5 +1,8 @@
 # Release Notes
 
+#### v0.6.0 (2020-Aug-11)
+   * Added support for User defined prompt patterns
+   * Added examples to support Cumulus (@saparikh)
 #### v0.5.0 (2020-Jun-28)
    * BREAKING Change: removed support of non-CSV files for filtering "@<file>".  Only
    CSV files are currently supported.

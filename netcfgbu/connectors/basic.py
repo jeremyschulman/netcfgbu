@@ -100,6 +100,12 @@ class BasicSSHConnector(object):
         if os_spec.ssh_configs:
             self.conn_args.update(os_spec.ssh_configs)
 
+        if os_spec.prompt_pattern:
+            self.PROMPT_PATTERN = re.compile(
+                (r"^\r?(" + os_spec.prompt_pattern + r")\s*$").encode("utf-8"),
+                flags=(re.M | re.I),
+            )
+
         self._cur_prompt: Optional[str] = None
         self.config = None
         self.save_file = None

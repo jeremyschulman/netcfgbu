@@ -159,6 +159,7 @@ class OSNameSpec(NoExtraBaseModel):
     linter: Optional[str]
     timeout: PositiveInt = Field(consts.DEFAULT_GETCONFIG_TIMEOUT)
     ssh_configs: Optional[Dict]
+    prompt_pattern: Optional[str]
 
 
 class LinterSpec(NoExtraBaseModel):

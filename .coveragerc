@@ -3,5 +3,4 @@ omit =
     netcfgbu/cli/main.py
     netcfgbu/cli/backup.py
     netcfgbu/cli/login.py
-    netcfgbu/connectors/*
     netcfgbu/logger*

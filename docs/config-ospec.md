@@ -18,6 +18,10 @@ declaring a timeout error.  Default is 60 seconds.
 Identifies the Linter specification to apply to the configuration once it
 has been retrieved.  See [Linters](#Linters) in next section.
 
+**`prompt_pattern`**<br/>
+Allows the User to define a custom prompt match regular expression pattern.
+Please be careful to ensure any special characters such as dash (-) are escaped.
+
 Examples:
 ```toml
 [os_name.ios]
@@ -30,6 +34,12 @@ Examples:
 
 [os_name.nxos]
     get_config = 'show running-config | no-more'
+
+[os_name.cumulus]
+    get_config = "( cat /etc/hostname; cat /etc/network/interfaces; cat /etc/cumulus/ports.conf; sudo cat /etc/frr/frr.conf)"
+
+    # example Cumulus prompt value: cumulus@leaf01:mgmt-vrf:~$
+    prompt_pattern = '[a-z0-9.\-@:~]{10,65}\s*[#$]'
 ```
 
 If you need to provide multiple commands, define a list of commands, as described
