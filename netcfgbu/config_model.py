@@ -115,7 +115,7 @@ class FilePathEnvExpand(FilePath):
 
 class GitSpec(NoExtraBaseModel):
     name: Optional[str]
-    repo: str
+    repo: EnvExpand
     email: Optional[str]
     username: Optional[EnvExpand]
     password: Optional[EnvExpand]
