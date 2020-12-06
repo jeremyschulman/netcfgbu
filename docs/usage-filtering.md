@@ -29,12 +29,29 @@ $ netcfgbu backup --limit 'os_name=iosxe|nxos'
 Example: Select all hosts that do _not_ "iosxe" or "nxos" as the network os_name:
 ```shell script
 $ netcfgbu backup --exclude 'os_name=iosxe|nxos'
-
+```
 
 Example: Select all hosts that use "iosxe" or "nxos" **and** have a name suffix of "mycorp.com"
 ```shell script
 $ netcfgbu backup --limit 'os_name=iosxe|nxos' --limit 'host=.*mycorp.com'
 ```
+
+Example: Select a host with a specific IP addresses:
+```shell script
+$ netcfgbu backup --limit "ipaddr=10.0.20.10"
+```
+
+Example: Select all hosts with IP addresses in a given prefix:
+```shell script
+$ netcfgbu backup --limit "ipaddr=2620:10:abcd::/64"
+```
+
+Example: Select all hosts with IP addresses that match a regex:
+```shell script
+$ netcfgbu backup --limit "ipaddr=10.(10|30).5.\d+"
+```
+
+
 
 
 ## Filter by CSV File Contents

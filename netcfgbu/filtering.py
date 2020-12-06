@@ -4,10 +4,12 @@ This file contains the filtering functions that are using to process the
 not specific to the netcfgbu inventory column names, can could be re-used for
 other CSV related tools and use-cases.
 """
-from typing import List, AnyStr, Optional, Callable, Dict
-import re
+import ipaddress
 import operator
+import re
+from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import List, AnyStr, Optional, Callable, Dict
 
 from .filetypes import CommentedCsvReader
 
@@ -19,15 +21,65 @@ file_reg = re.compile(r"@(?P<filename>.+)$")
 wordsep_re = re.compile(r"\s+|,")
 
 
-def mk_op_filter(_reg, _fieldn):
-    def op_filter(rec):
-        return _reg.match(rec[_fieldn])
+class Filter(ABC):
+    """Filter is a type that supports op comparisons against inventory fields
 
-    op_filter.__doc__ = f"limit_{_fieldn}({_reg.pattern})"
-    op_filter.__name__ = op_filter.__doc__
-    op_filter.__qualname__ = op_filter.__doc__
+    An implementation of Filter should capture:
+     - The record fieldname to compare
+     - The filter expression
 
-    return op_filter
+    A Filter instance will be passed an inventory record when called, returning
+        the bool result of whether the record matches the filter
+    """
+
+    @abstractmethod
+    def __call__(self, record: Dict[str, AnyStr]) -> bool:
+        pass
+
+
+class RegexFilter(Filter):
+    """ Filter an inventory record field with a given regex """
+
+    def __init__(self, fieldname: str, expr: str) -> None:
+        self.fieldname = fieldname
+        try:
+            self.re = re.compile(f"^{expr}$", re.IGNORECASE)
+        except re.error as exc:
+            raise ValueError(
+                f"Invalid filter regular-expression: {expr!r}: {exc}"
+            ) from None
+
+        self.__doc__ = f"limit_{fieldname}({self.re.pattern})"
+        self.__name__ = self.__doc__
+        self.__qualname__ = self.__doc__
+
+    def __call__(self, record: Dict[str, AnyStr]) -> bool:
+        return bool(self.re.match(record[self.fieldname]))
+
+    def __repr__(self) -> str:
+        return f"RegexFilter(fieldname={self.fieldname!r}, expr={self.re})"
+
+
+class IPFilter(Filter):
+    """Filter an inventory record field based on IP address
+
+    When the specified filter ip address is a prefix (E.g 192.168.0.0/28), will
+        check that the record IP is within the prefix range
+    Will interpret single IP addresses (E.g. 2620:abcd:10::10) as an absolute match
+    """
+
+    def __init__(self, fieldname: str, ip: str) -> None:
+        self.fieldname = fieldname
+        self.ip = ipaddress.ip_network(ip)
+        self.__doc__ = f"limit_{fieldname}({self.ip})"
+        self.__name__ = self.__doc__
+        self.__qualname__ = self.__doc__
+
+    def __call__(self, record: Dict[str, AnyStr]) -> bool:
+        return ipaddress.ip_address(record[self.fieldname]) in self.ip
+
+    def __repr__(self) -> str:
+        return f"IpFilter(fieldname={self.fieldname!r}, ip='{self.ip}')"
 
 
 def create_filter_function(op_filters, optest_fn):
@@ -93,7 +145,7 @@ def create_filter(
     fieldn_pattern = "^(?P<keyword>" + "|".join(fieldn for fieldn in field_names) + ")"
     field_value_reg = re.compile(fieldn_pattern + "=" + value_pattern)
 
-    op_filters = list()
+    op_filters: List[Filter] = []
     for filter_expr in constraints:
 
         # check for the '@<filename>' filtering use-case first.
@@ -119,15 +171,15 @@ def create_filter(
 
         fieldn, value = mo.groupdict().values()
 
-        try:
-            value_reg = re.compile(f"^{value}$", re.IGNORECASE)
+        if fieldn.casefold() == "ipaddr":
+            try:
+                value_filter = IPFilter(fieldn, value)
+            except ValueError:
+                value_filter = RegexFilter(fieldn, value)
+        else:
+            value_filter = RegexFilter(fieldn, value)
 
-        except re.error as exc:
-            raise ValueError(
-                f"Invalid filter regular-expression: {filter_expr}: {str(exc)}"
-            )
-
-        op_filters.append(mk_op_filter(value_reg, fieldn))
+        op_filters.append(value_filter)
 
     optest_fn = operator.not_ if include else operator.truth
     filter_fn = create_filter_function(op_filters, optest_fn)
